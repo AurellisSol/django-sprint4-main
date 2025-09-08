@@ -132,13 +132,15 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
 
 class PostDeleteView(LoginRequiredMixin, DeleteView):
     model = Post
-    template_name = 'blog/delete_post.html'
+    template_name = 'blog/create.html'
+    pk_url_kwarg = 'post_id'
     
     def get_queryset(self):
         return Post.objects.filter(author=self.request.user)
     
     def get_success_url(self):
         return reverse_lazy('blog:profile', kwargs={'username': self.request.user.username})
+
 
 
 class RegistrationView(FormView):
