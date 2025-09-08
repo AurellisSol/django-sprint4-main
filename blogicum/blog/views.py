@@ -1,27 +1,42 @@
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.views.generic import ListView, DetailView, CreateView
+from django.views.generic import ListView, DetailView, CreateView, FormView
 from django.db.models import QuerySet
 from django.urls import reverse_lazy
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import UserCreationForm
+from django.db import models
 
 from .models import Post, Category
 
 
 class PostQuerySetMixin:
     """Миксин для получения базового QuerySet публикаций"""
-
+    
     def get_base_queryset(self) -> QuerySet:
-        return Post.objects.select_related(
-            'category', 'location', 'author'
-        ).filter(
-            is_published=True,
-            pub_date__lte=timezone.now(),
-            category__is_published=True
-        )
+        # Для анонимных пользователей - только опубликованные посты
+        # Для авторизованных - свои посты показываются всегда
+        queryset = Post.objects.select_related('category', 'location', 'author')
+        
+        if not self.request.user.is_authenticated:
+            # Анонимные пользователи видят только опубликованные посты
+            return queryset.filter(
+                is_published=True,
+                pub_date__lte=timezone.now(),
+                category__is_published=True
+            )
+        else:
+            # Авторизованные пользователи видят свои посты + опубликованные чужие
+            return queryset.filter(
+                models.Q(author=self.request.user) |
+                models.Q(
+                    is_published=True,
+                    pub_date__lte=timezone.now(),
+                    category__is_published=True
+                )
+            )
 
 
 class PostListView(PostQuerySetMixin, ListView):
@@ -87,14 +102,26 @@ class ProfileView(DetailView):
     context_object_name = 'profile_user'
     slug_field = 'username'
     slug_url_kwarg = 'username'
-
+    
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.get_object()
-        # Добавьте логику для получения постов пользователя, если нужно
-        # context['posts'] = user.posts.all()
+        
+        # Показываем ВСЕ посты пользователя (включая отложенные и неопубликованные)
+        # Для автора показываем все посты, для других - только опубликованные
+        if self.request.user == user:
+            posts = user.posts.all()  # Все посты для автора
+        else:
+            posts = user.posts.filter(
+                is_published=True,
+                pub_date__lte=timezone.now(),
+                category__is_published=True
+            )
+        
+        context['posts'] = posts
         context['is_owner'] = self.request.user == user
         return context
+
 
 
 class AutoLoginMixin:
@@ -105,13 +132,31 @@ class AutoLoginMixin:
         login(self.request, self.object)
         return response
 
-class RegistrationView(CreateView):
-    """CBV класс для регистрации с автоматическим входом"""
+
+class RegistrationView(FormView):
+    """CBV класс для регистрации с автоматическим входом (используем FormView)"""
     form_class = UserCreationForm
     template_name = 'registration/registration_form.html'
     success_url = reverse_lazy('blog:index')
-
+    
     def form_valid(self, form):
-        response = super().form_valid(form)
-        login(self.request, self.object)
-        return response
+        # Сохраняем пользователя
+        user = form.save()
+        # Автоматически логиним пользователя
+        login(self.request, user)
+        # Добавляем сообщение об успехе
+        return super().form_valid(form)
+
+
+class PostCreateView(LoginRequiredMixin, CreateView):
+    """Создание новой публикации"""
+    model = Post
+    template_name = 'blog/create_post.html'
+    fields = ['title', 'text', 'pub_date', 'location', 'category']
+    
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        return super().form_valid(form)
+    
+    def get_success_url(self):
+        return reverse_lazy('blog:profile', kwargs={'username': self.request.user.username})

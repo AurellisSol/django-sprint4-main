@@ -1,12 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
-from django.views.generic.edit import CreateView
 
-from blog.views import AutoLoginMixin
-
-
-class RegistrationView(AutoLoginMixin, CreateView):
-    pass
+from blog.views import RegistrationView
 
 
 handler403 = 'pages.views.csrf_failure'
