@@ -6,6 +6,7 @@ from django.urls import reverse_lazy
 from django.contrib.auth.models import User
 from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.forms import UserCreationForm
 
 from .models import Post, Category
 
@@ -86,7 +87,7 @@ class ProfileView(DetailView):
     context_object_name = 'profile_user'
     slug_field = 'username'
     slug_url_kwarg = 'username'
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.get_object()
@@ -94,11 +95,22 @@ class ProfileView(DetailView):
         # context['posts'] = user.posts.all()
         context['is_owner'] = self.request.user == user
         return context
-    
+
 
 class AutoLoginMixin:
     """Миксин для автоматического входа после регистрации"""
-    
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        login(self.request, self.object)
+        return response
+
+class RegistrationView(CreateView):
+    """CBV класс для регистрации с автоматическим входом"""
+    form_class = UserCreationForm
+    template_name = 'registration/registration_form.html'
+    success_url = reverse_lazy('blog:index')
+
     def form_valid(self, form):
         response = super().form_valid(form)
         login(self.request, self.object)
