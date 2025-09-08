@@ -30,6 +30,9 @@ LOGIN_REDIRECT_URL = 'blog:index'
 LOGIN_URL = 'login'
 LOGOUT_REDIRECT_URL = 'blog:index'
 
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 # Application definition
 
 INSTALLED_APPS = [
