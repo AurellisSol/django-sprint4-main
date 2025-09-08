@@ -8,6 +8,7 @@ from django.contrib.auth import login
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.forms import UserCreationForm
 from django.db import models
+from django.core.paginator import Paginator
 
 from .models import Post, Category
 
@@ -51,9 +52,7 @@ class PostListView(PostQuerySetMixin, ListView):
 
 class IndexView(PostListView):
     """Главная страница блога"""
-
-    def get_queryset(self) -> QuerySet:
-        return super().get_queryset()[:self.paginate_by]
+    pass
 
 
 class PostDetailView(PostQuerySetMixin, DetailView):
@@ -70,7 +69,7 @@ class PostDetailView(PostQuerySetMixin, DetailView):
 class CategoryPostsView(PostListView):
     """Список публикаций категории"""
     template_name = 'blog/category.html'
-
+    
     def get_queryset(self) -> QuerySet:
         category_slug = self.kwargs['category_slug']
         self.category = get_object_or_404(
@@ -78,11 +77,6 @@ class CategoryPostsView(PostListView):
             slug=category_slug
         )
         return super().get_queryset().filter(category=self.category)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['category'] = self.category
-        return context
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -102,6 +96,7 @@ class ProfileView(DetailView):
     context_object_name = 'profile_user'
     slug_field = 'username'
     slug_url_kwarg = 'username'
+    paginate_by = 10  # Добавляем пагинацию для профиля
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -117,12 +112,14 @@ class ProfileView(DetailView):
                 pub_date__lte=timezone.now(),
                 category__is_published=True
             )
+
+        paginator = Paginator(posts, self.paginate_by)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
         
-        context['posts'] = posts
+        context['posts'] = page_obj
         context['is_owner'] = self.request.user == user
         return context
-
-
 
 class AutoLoginMixin:
     """Миксин для автоматического входа после регистрации"""
@@ -151,7 +148,7 @@ class RegistrationView(FormView):
 class PostCreateView(LoginRequiredMixin, CreateView):
     """Создание новой публикации"""
     model = Post
-    template_name = 'blog/create_post.html'
+    template_name = 'blog/create.html'
     fields = ['title', 'text', 'pub_date', 'location', 'category']
     
     def form_valid(self, form):
