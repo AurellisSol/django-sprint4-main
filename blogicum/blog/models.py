@@ -104,7 +104,8 @@ class Post(PublishedCreatedModel):
 
     def __str__(self):
         return self.title
-    
+
+
 class Comment(models.Model):
     post = models.ForeignKey(
         Post,

@@ -12,5 +12,4 @@ urlpatterns = [
     path('profile/<str:username>/', views.ProfileView.as_view(), name='profile'),
     path('posts/<int:pk>/edit/', views.PostUpdateView.as_view(), name='edit_post'),
     path('posts/<int:pk>/delete/', views.PostDeleteView.as_view(), name='delete_post'),
-    path('posts/<int:post_id>/comment/', views.add_comment, name='add_comment'),
 ]
