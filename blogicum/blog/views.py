@@ -8,6 +8,7 @@ from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
+from django.views import View
 
 from .models import Post, Category, Comment
 from .forms import CommentForm
@@ -163,23 +164,20 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
         return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})
 
 
-class CommentDeleteView(LoginRequiredMixin, DeleteView):
-    model = Comment
-    template_name = 'blog/detail.html'
-    pk_url_kwarg = 'comment_id'
+class CommentDeleteView(LoginRequiredMixin, View):
+    def get(self, request, post_id, comment_id):
+        comment = get_object_or_404(Comment, id=comment_id, author=request.user)
+        return render(request, 'blog/detail.html', {
+            'post': comment.post,
+            'show_delete_comment_confirmation': True,
+            'comment_to_delete': comment
+        })
     
-    def get_queryset(self):
-        return Comment.objects.filter(author=self.request.user)
-    
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['post'] = self.object.post
-        context['show_delete_comment_confirmation'] = True
-        context['comment_to_delete'] = self.object
-        return context
-    
-    def get_success_url(self):
-        return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})
+    def post(self, request, post_id, comment_id):
+        comment = get_object_or_404(Comment, id=comment_id, author=request.user)
+        comment.delete()
+        messages.success(request, 'Комментарий успешно удален!')
+        return redirect('blog:post_detail', post_id=comment.post.id)
 
 
 class RegistrationView(FormView):
