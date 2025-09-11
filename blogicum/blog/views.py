@@ -68,12 +68,12 @@ class PostDetailView(PostQuerySetMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        form = CommentForm()
         context["title"] = self.object.title
         context["text"] = self.object.text
+        form = CommentForm()
         context.update(
             {
-                "form": form,
+                "comment_form": form,
                 "comments": self._get_post_comments(),
                 "is_form_disabled": True,
             }
@@ -97,7 +97,7 @@ class CategoryPostsView(PostListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["category"] = self.category
-        context["title"] = self.object.title
+        context["title"] = self.category.title
         context["description"] = self.object.description
         return context
 
@@ -145,19 +145,24 @@ class ProfileView(DetailView):
 
 class EditProfileView(LoginRequiredMixin, UpdateView):
     model = User
-    template_name = "blog/profile.html"
     fields = ["first_name", "last_name", "username", "email"]
+    template_name = "blog/user.html"
 
     def get_object(self):
         return self.request.user
 
     def get_success_url(self):
-        return reverse_lazy("blog:profile", kwargs={"username": self.request.user.username})
+        return reverse_lazy(
+            "blog:profile", kwargs={"username": self.request.user.username}
+        )
 
-    def form_valid(self, form):
-        user = form.save(commit=False)
-        user.save()
-        return super().form_valid(form)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["profile"] = self.request.user
+        context["is_owner"] = True
+        return context
+
+
 
 class PostCreateView(LoginRequiredMixin, CreateView):
     """Создание нового поста."""
@@ -225,7 +230,7 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
         form = CommentForm
         context.update(
             {
-                "form": form,
+                "comment_form": form,
                 "comments": self._get_post_comments(),
                 "is_form_disabled": True,
             }
