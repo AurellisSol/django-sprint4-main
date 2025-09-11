@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import (
-    ListView, DetailView, CreateView,
+    View, ListView, DetailView, CreateView,
     DeleteView, FormView,
 )
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.core.paginator import Paginator
 from django.views.generic.edit import UpdateView
+from django.http import Http404
 
 from .models import Post, Category, Comment
 from .forms import CommentForm
@@ -68,18 +69,9 @@ class PostDetailView(PostQuerySetMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = self.object.title
-        context["text"] = self.object.text
-        form = CommentForm()
-        context.update(
-            {
-                "comment_form": form,
-                "comments": self._get_post_comments(),
-                "is_form_disabled": True,
-            }
-        )
+        context['form'] = CommentForm()
+        context['comments'] = self.object.comments.select_related('author')
         return context
-
 
 
 class CategoryPostsView(PostListView):
@@ -98,7 +90,7 @@ class CategoryPostsView(PostListView):
         context = super().get_context_data(**kwargs)
         context["category"] = self.category
         context["title"] = self.category.title
-        context["description"] = self.object.description
+        context["description"] = self.category.description
         return context
 
 
@@ -107,7 +99,7 @@ class ProfileView(DetailView):
 
     model = User
     template_name = "blog/profile.html"
-    context_object_name = "profile"  # 👈 совпадает с шаблоном
+    context_object_name = "profile"
     slug_field = "username"
     slug_url_kwarg = "username"
     paginate_by = 10
@@ -161,7 +153,6 @@ class EditProfileView(LoginRequiredMixin, UpdateView):
         context["profile"] = self.request.user
         context["is_owner"] = True
         return context
-
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -284,16 +275,19 @@ class RegistrationView(FormView):
         return redirect("blog:profile", username=user.username)
 
 
-@login_required
-def add_comment(request, post_id):
-    """Добавление комментария к посту."""
-    post = get_object_or_404(Post, id=post_id)
-    form = CommentForm(request.POST)
-    if form.is_valid():
-        comment = form.save(commit=False)
-        comment.author = request.user
-        comment.post = post
-        comment.save()
-    return redirect("blog:post_detail", post_id=post_id)
-
-
+class AddCommentView(LoginRequiredMixin, View):
+    def post(self, request, post_id):
+        post = get_object_or_404(Post, id=post_id)
+        
+        # Дополнительная проверка на публикацию
+        if not post.is_published:
+            raise Http404("Пост не опубликован")
+            
+        form = CommentForm(request.POST)
+        if form.is_valid():
+            comment = form.save(commit=False)
+            comment.post = post
+            comment.author = request.user
+            comment.save()
+        
+        return redirect('blog:post_detail', pk=post_id)
