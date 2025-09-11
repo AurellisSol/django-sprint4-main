@@ -1,4 +1,4 @@
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, FormView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import QuerySet, Count
@@ -164,20 +164,32 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
         return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})
 
 
-class CommentDeleteView(LoginRequiredMixin, View):
-    def get(self, request, post_id, comment_id):
-        comment = get_object_or_404(Comment, id=comment_id, author=request.user)
-        return render(request, 'blog/detail.html', {
-            'post': comment.post,
-            'show_delete_comment_confirmation': True,
-            'comment_to_delete': comment
-        })
+class CommentDeleteView(LoginRequiredMixin, DeleteView):
+    model = Comment
+    template_name = 'blog/detail.html'
+    pk_url_kwarg = 'comment_id'
     
-    def post(self, request, post_id, comment_id):
-        comment = get_object_or_404(Comment, id=comment_id, author=request.user)
-        comment.delete()
-        messages.success(request, 'Комментарий успешно удален!')
-        return redirect('blog:post_detail', post_id=comment.post.id)
+    def get_queryset(self):
+        return Comment.objects.filter(author=self.request.user)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Добавляем необходимый контекст для шаблона
+        context['post'] = self.object.post
+        context['form'] = CommentForm()
+        context['comments'] = self.object.post.comments.select_related('author')
+        context['show_delete_comment_confirmation'] = True
+        context['comment_to_delete'] = self.object
+        return context
+    
+    def get_success_url(self):
+        messages.success(self.request, 'Комментарий успешно удален!')
+        return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})
+    
+    # Убедимся, что форма не мешает
+    def get_form(self, form_class=None):
+        return None
+
 
 
 class RegistrationView(FormView):
