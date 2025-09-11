@@ -1,13 +1,13 @@
 from django.shortcuts import get_object_or_404, redirect
-from django.utils import timezone
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView, FormView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import QuerySet, Q
+from django.db.models import QuerySet, Count
 from django.urls import reverse_lazy
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
+from django.utils import timezone
 
 from .models import Post, Category, Comment
 from .forms import CommentForm
@@ -22,7 +22,7 @@ class PostQuerySetMixin:
             is_published=True,
             pub_date__lte=timezone.now(),
             category__is_published=True
-        )
+        ).annotate(comment_count=Count('comments'))
 
 
 class PostListView(PostQuerySetMixin, ListView):
@@ -84,13 +84,13 @@ class ProfileView(DetailView):
         user = self.get_object()
         
         if self.request.user == user:
-            posts = user.posts.all()
+            posts = user.posts.annotate(comment_count=Count('comments'))
         else:
             posts = user.posts.filter(
                 is_published=True,
                 pub_date__lte=timezone.now(),
                 category__is_published=True
-            )
+            ).annotate(comment_count=Count('comments'))
         
         from django.core.paginator import Paginator
         paginator = Paginator(posts, self.paginate_by)
@@ -131,24 +131,55 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
 
 
 class PostDeleteView(LoginRequiredMixin, DeleteView):
-    model = Post
-    template_name = 'blog/detail.html'  # Используем существующий шаблон
+    model = Comment
+    template_name = 'blog/detail.html'
     pk_url_kwarg = 'post_id'
     
+    def test_func(self, comment_id):
+        comment = self.get_object()
+        if self.request.user == comment.name:
+            return render(request, "comment_confirm_delete.html")
+        else:
+            return HttpResponseRedirect(reverse('post_detail', args=[slug]))
+
+
+class CommentUpdateView(LoginRequiredMixin, UpdateView):
+    model = Comment
+    form_class = CommentForm
+    template_name = 'blog/detail.html'
+    pk_url_kwarg = 'comment_id'
+    
     def get_queryset(self):
-        return Post.objects.filter(author=self.request.user)
+        return Comment.objects.filter(author=self.request.user)
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Добавляем флаг для отображения подтверждения удаления
-        context['show_delete_confirmation'] = True
+        context['post'] = self.object.post
+        context['show_edit_comment'] = True
+        context['editing_comment'] = self.object
         return context
     
     def get_success_url(self):
-        messages.success(self.request, 'Пост успешно удален!')
-        return reverse_lazy('blog:profile', kwargs={'username': self.request.user.username})
+        return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})
 
 
+class CommentDeleteView(LoginRequiredMixin, DeleteView):
+    model = Comment
+    template_name = 'blog/detail.html'
+    pk_url_kwarg = 'comment_id'
+    
+    def get_queryset(self):
+        return Comment.objects.filter(author=self.request.user)
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['post'] = self.object.post
+        context['show_delete_comment_confirmation'] = True
+        context['comment_to_delete'] = self.object
+        return context
+    
+    def get_success_url(self):
+        return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})
 
 
 class RegistrationView(FormView):
@@ -172,21 +203,3 @@ def add_comment(request, post_id):
         comment.post = post
         comment.save()
     return redirect('blog:post_detail', post_id=post_id)
-
-class CommentDeleteView(LoginRequiredMixin, DeleteView):
-    model = Comment
-    template_name = 'blog/detail.html'  # Используем существующий шаблон
-    pk_url_kwarg = 'comment_id'
-
-    def get_queryset(self):
-        return Comment.objects.filter(author=self.request.user)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['post'] = self.object.post
-        context['show_comment_delete_confirmation'] = True
-        context['comment_to_delete'] = self.object
-        return context
-
-    def get_success_url(self):
-        return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})

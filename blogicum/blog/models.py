@@ -120,6 +120,7 @@ class Comment(models.Model):
     )
     text = models.TextField('Текст комментария')
     created_at = models.DateTimeField('Дата добавления', auto_now_add=True)
+    updated_at = models.DateTimeField('Дата изменения', auto_now=True)
 
     class Meta:
         verbose_name = 'комментарий'
@@ -127,4 +128,5 @@ class Comment(models.Model):
         ordering = ('created_at',)
 
     def __str__(self):
-        return f'Комментарий {self.author} к {self.post}'
+        return f'Комментарий {self.author} к {self.post.title}'
+
