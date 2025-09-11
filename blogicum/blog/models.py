@@ -35,6 +35,8 @@ class Category(PublishedCreatedModel):
         help_text='Идентификатор страницы для URL; '
         'разрешены символы латиницы, цифры, дефис и подчёркивание.'
     )
+    is_published = models.BooleanField(default=True)
+    created_at = models.DateField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'категория'
@@ -49,6 +51,8 @@ class Location(PublishedCreatedModel):
         'Название места',
         max_length=MAX_CHAR_FIELD_LENGTH
     )
+    is_published = models.BooleanField(default=True)
+    created_at = models.DateField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'местоположение'
@@ -95,6 +99,8 @@ class Post(PublishedCreatedModel):
         blank=True,
         null=True
     )
+    is_published = models.BooleanField(default=True)
+    created_at = models.DateField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'публикация'
@@ -120,7 +126,6 @@ class Comment(models.Model):
     )
     text = models.TextField('Текст комментария')
     created_at = models.DateTimeField('Дата добавления', auto_now_add=True)
-    updated_at = models.DateTimeField('Дата изменения', auto_now=True)
 
     class Meta:
         verbose_name = 'комментарий'

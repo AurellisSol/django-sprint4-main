@@ -68,11 +68,12 @@ class PostDetailView(PostQuerySetMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        comment_form = CommentForm()
+        form = CommentForm()
+        context["title"] = self.object.title
+        context["text"] = self.object.text
         context.update(
             {
-                "form": comment_form,
-                "comment_form": comment_form,
+                "form": form,
                 "comments": self._get_post_comments(),
                 "is_form_disabled": True,
             }
@@ -96,6 +97,8 @@ class CategoryPostsView(PostListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["category"] = self.category
+        context["title"] = self.object.title
+        context["description"] = self.object.description
         return context
 
 
@@ -151,6 +154,10 @@ class EditProfileView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse_lazy("blog:profile", kwargs={"username": self.request.user.username})
 
+    def form_valid(self, form):
+        user = form.save(commit=False)
+        user.save()
+        return super().form_valid(form)
 
 class PostCreateView(LoginRequiredMixin, CreateView):
     """Создание нового поста."""
