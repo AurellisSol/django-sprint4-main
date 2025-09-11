@@ -1,7 +1,7 @@
 from django.shortcuts import get_object_or_404, redirect
 from django.views.generic import (
     ListView, DetailView, CreateView,
-    UpdateView, DeleteView, FormView,
+    DeleteView, FormView,
 )
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import QuerySet, Count
@@ -12,6 +12,7 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.utils import timezone
 from django.core.paginator import Paginator
+from django.views.generic.edit import UpdateView
 
 from .models import Post, Category, Comment
 from .forms import CommentForm
@@ -137,6 +138,18 @@ class ProfileView(DetailView):
             }
         )
         return context
+
+
+class EditProfileView(LoginRequiredMixin, UpdateView):
+    model = User
+    template_name = "blog/edit_profile.html"
+    fields = ["first_name", "last_name", "username", "email"]
+
+    def get_object(self):
+        return self.request.user
+
+    def get_success_url(self):
+        return reverse_lazy("blog:profile", kwargs={"username": self.request.user.username})
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -270,15 +283,4 @@ def add_comment(request, post_id):
         comment.save()
     return redirect("blog:post_detail", post_id=post_id)
 
-
-class EditProfileView(LoginRequiredMixin, UpdateView):
-    model = User
-    template_name = "blog/edit_profile.html"
-    fields = ["first_name", "last_name", "username", "email"]
-
-    def get_object(self):
-        return self.request.user
-
-    def get_success_url(self):
-        return reverse_lazy("blog:profile", kwargs={"username": self.request.user.username})
 
