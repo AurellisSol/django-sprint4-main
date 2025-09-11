@@ -67,14 +67,17 @@ class PostDetailView(PostQuerySetMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        comment_form = CommentForm()
         context.update(
             {
-                "comment_form": CommentForm(),
+                "form": comment_form,
+                "comment_form": comment_form,
                 "comments": self._get_post_comments(),
                 "is_form_disabled": True,
             }
         )
         return context
+
 
 
 class CategoryPostsView(PostListView):
@@ -100,7 +103,7 @@ class ProfileView(DetailView):
 
     model = User
     template_name = "blog/profile.html"
-    context_object_name = "profile_user"
+    context_object_name = "profile"  # 👈 совпадает с шаблоном
     slug_field = "username"
     slug_url_kwarg = "username"
     paginate_by = 10
@@ -121,14 +124,16 @@ class ProfileView(DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        user = self.get_object()
-        posts = self._get_user_posts(user)
+        profile = self.get_object()
+        posts = self._get_user_posts(profile)
         page_obj = self._paginate_posts(posts)
 
         context.update(
             {
                 "page_obj": page_obj,
-                "is_owner": self.request.user == user,
+                "is_owner": self.request.user == profile,
+                # 👇 добавляем, чтобы шаблон мог использовать
+                "profile_full_name": profile.get_full_name() or None,
             }
         )
         return context
@@ -200,7 +205,6 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
         context.update(
             {
                 "form": form,
-                "comment_form": form,
                 "comments": self._get_post_comments(),
                 "is_form_disabled": True,
             }
@@ -245,16 +249,13 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
 
 
 class RegistrationView(FormView):
-    """Регистрация нового пользователя."""
-
     form_class = UserCreationForm
     template_name = "registration/registration_form.html"
-    success_url = reverse_lazy("blog:index")
 
     def form_valid(self, form):
         user = form.save()
         login(self.request, user)
-        return super().form_valid(form)
+        return redirect("blog:profile", username=user.username)
 
 
 @login_required
@@ -268,4 +269,16 @@ def add_comment(request, post_id):
         comment.post = post
         comment.save()
     return redirect("blog:post_detail", post_id=post_id)
-    
+
+
+class EditProfileView(LoginRequiredMixin, UpdateView):
+    model = User
+    template_name = "blog/edit_profile.html"
+    fields = ["first_name", "last_name", "username", "email"]
+
+    def get_object(self):
+        return self.request.user
+
+    def get_success_url(self):
+        return reverse_lazy("blog:profile", kwargs={"username": self.request.user.username})
+
