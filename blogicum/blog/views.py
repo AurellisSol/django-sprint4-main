@@ -196,14 +196,17 @@ class CommentUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        form = CommentForm
         context.update(
             {
-                "post": self.object.post,
-                "is_comment_edit_mode": True,
-                "comment_being_edited": self.object,
+                "form": form,
+                "comment_form": form,
+                "comments": self._get_post_comments(),
+                "is_form_disabled": True,
             }
         )
         return context
+
 
     def get_success_url(self):
         return reverse_lazy(
@@ -265,3 +268,4 @@ def add_comment(request, post_id):
         comment.post = post
         comment.save()
     return redirect("blog:post_detail", post_id=post_id)
+    
