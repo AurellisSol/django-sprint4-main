@@ -142,7 +142,7 @@ class ProfileView(DetailView):
 
 class EditProfileView(LoginRequiredMixin, UpdateView):
     model = User
-    template_name = "blog/edit_profile.html"
+    template_name = "blog/profile.html"
     fields = ["first_name", "last_name", "username", "email"]
 
     def get_object(self):
@@ -176,6 +176,7 @@ class PostUpdateView(LoginRequiredMixin, UpdateView):
     model = Post
     template_name = "blog/create.html"
     fields = ["title", "text", "pub_date", "location", "category", "image"]
+    pk_url_kwarg = "post_id"
 
     def get_queryset(self):
         return Post.objects.filter(author=self.request.user)
