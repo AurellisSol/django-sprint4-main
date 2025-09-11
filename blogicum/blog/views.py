@@ -51,8 +51,10 @@ class PostDetailView(PostQuerySetMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form'] = CommentForm()
-        context['comments'] = self.object.comments.select_related('author')
+        context['comments'] = self.object.comments.select_related('author').order_by('created_at')
+        context['disable_form'] = True
         return context
+
 
 
 class CategoryPostsView(PostListView):
@@ -168,27 +170,21 @@ class CommentDeleteView(LoginRequiredMixin, DeleteView):
     model = Comment
     template_name = 'blog/detail.html'
     pk_url_kwarg = 'comment_id'
-    
+
     def get_queryset(self):
         return Comment.objects.filter(author=self.request.user)
-    
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Добавляем необходимый контекст для шаблона
         context['post'] = self.object.post
-        context['form'] = CommentForm()
-        context['comments'] = self.object.post.comments.select_related('author')
         context['show_delete_comment_confirmation'] = True
-        context['comment_to_delete'] = self.object
         return context
-    
+
     def get_success_url(self):
-        messages.success(self.request, 'Комментарий успешно удален!')
-        return reverse_lazy('blog:post_detail', kwargs={'post_id': self.object.post.id})
-    
-    # Убедимся, что форма не мешает
-    def get_form(self, form_class=None):
-        return None
+        return reverse_lazy(
+            'blog:post_detail',
+            kwargs={'post_id': self.object.post.id}
+        )
 
 
 
