@@ -90,7 +90,10 @@ class Location(BaseModel):
 
 
 class Post(BaseModel):
-    title = models.CharField(max_length=MAX_TITLE_LENGTH, verbose_name='Заголовок')
+    title = models.CharField(
+        max_length=MAX_TITLE_LENGTH,
+        verbose_name='Заголовок'
+    )
     text = models.TextField(verbose_name='Текст')
     pub_date = models.DateTimeField(
         default=timezone.now,
@@ -125,7 +128,6 @@ class Post(BaseModel):
         verbose_name_plural = 'Публикации'
         ordering = ('-pub_date',)
         default_related_name = 'posts'
-
 
 
 class Comment(models.Model):

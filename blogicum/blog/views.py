@@ -1,7 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
-from django.db.models import Count
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -13,7 +12,7 @@ from django.views.generic import (
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
 from django.http import Http404
-
+from django.utils import timezone
 
 from .forms import CreateCommentForm, CreatePostForm, EditProfileForm
 from .models import Category, Comment, Post, User
@@ -99,7 +98,6 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
 
 
 class CommentDeleteView(
-    CommentEditMixin,
     LoginRequiredMixin,
     AuthorOrStaffRequiredMixin,
     DeleteView
@@ -122,7 +120,6 @@ class CommentDeleteView(
 
 
 class CommentUpdateView(
-    CommentEditMixin,
     LoginRequiredMixin,
     AuthorOrStaffRequiredMixin,
     UpdateView
@@ -153,7 +150,10 @@ class EditProfileView(LoginRequiredMixin, UpdateView):
         return self.request.user
 
     def get_success_url(self):
-        return reverse('blog:profile', kwargs={'username': self.request.user.username})
+        return reverse(
+            'blog:profile',
+            kwargs={'username': self.request.user.username}
+        )
 
 
 class AuthorProfileListView(ListView):
@@ -169,9 +169,15 @@ class AuthorProfileListView(ListView):
         profile_user = self.get_profile_user()
 
         if self.request.user == profile_user:
-            queryset = get_post_queryset(apply_filters=False, apply_annotation=True)
+            queryset = get_post_queryset(
+                apply_filters=False,
+                apply_annotation=True
+            )
         else:
-            queryset = get_post_queryset(apply_filters=True, apply_annotation=True)
+            queryset = get_post_queryset(
+                apply_filters=True,
+                apply_annotation=True
+            )
 
         return queryset.filter(author=profile_user)
 
@@ -246,9 +252,12 @@ class PostDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form'] = CreateCommentForm()
-        context['comments'] = self.object.comments.select_related('author').all()
+        context['comments'] = (
+            self.object.comments
+            .select_related('author')
+            .all()
+        )
         return context
-
 
 
 class RegistrationView(FormView):

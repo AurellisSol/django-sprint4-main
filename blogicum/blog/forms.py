@@ -1,7 +1,10 @@
 from django import forms
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 
 from .models import Comment, Post
+
+User = get_user_model()
 
 
 class CreatePostForm(forms.ModelForm):
@@ -18,15 +21,7 @@ class CreatePostForm(forms.ModelForm):
 
     class Meta:
         model = Post
-        fields = (
-            'title',
-            'image',
-            'text',
-            'pub_date',
-            'location',
-            'category',
-            'is_published',
-        )
+        exclude = ('author',)
 
 
 class CreateCommentForm(forms.ModelForm):
@@ -42,5 +37,8 @@ class EditProfileForm(forms.ModelForm):
         widgets = {
             'first_name': forms.TextInput(attrs={'placeholder': 'Имя'}),
             'last_name': forms.TextInput(attrs={'placeholder': 'Фамилия'}),
-            'email': forms.EmailInput(attrs={'placeholder': 'example@mail.com'}),
+            'email': forms.EmailInput(attrs={
+                'placeholder': 'example@mail.com'
+            }
+            ),
         }
