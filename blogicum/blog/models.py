@@ -35,11 +35,13 @@ class BaseModel(models.Model):
     )
     created_at = models.DateTimeField(
         auto_now_add=True,
-        verbose_name='Добавлено',
+        verbose_name="Дата создания",
     )
     updated_at = models.DateTimeField(
         auto_now=True,
-        verbose_name='Дата обновления',
+        null=True,
+        blank=True,
+        verbose_name="Дата изменения",
     )
 
     class Meta:
@@ -121,7 +123,7 @@ class Post(BaseModel):
         null=True,
     )
     image = models.ImageField('Изображение', blank=True, upload_to='img/')
-    post_list = PostManager()
+    objects = PostManager()
 
     class Meta:
         verbose_name = 'публикация'

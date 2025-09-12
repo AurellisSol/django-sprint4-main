@@ -11,7 +11,7 @@ from django.views.generic import (
 )
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
-from django.http import Http404
+from django.http import Http404, HttpResponseRedirect
 from django.utils import timezone
 
 from .forms import CreateCommentForm, CreatePostForm, EditProfileForm
@@ -35,9 +35,8 @@ class PostDeleteView(
 
     def get_object(self, queryset=None):
         return get_object_or_404(
-            Comment,
-            pk=self.kwargs['comment_pk'],
-            post__pk=self.kwargs['post_pk']
+            Post,
+            pk=self.kwargs['post_pk']
         )
 
     def get_success_url(self):
@@ -82,6 +81,41 @@ class PostCreateView(LoginRequiredMixin, CreateView):
         )
 
 
+class PostDetailView(DetailView):
+    """Детальная страница поста"""
+
+    model = Post
+    template_name = 'blog/detail.html'
+    pk_url_kwarg = 'post_pk'
+
+    def get_object(self, queryset=None):
+        post = get_object_or_404(
+            Post.objects.select_related('author', 'location', 'category'),
+            pk=self.kwargs['post_pk']
+        )
+
+        if (
+            post.author != self.request.user and (
+                not post.is_published
+                or not post.category.is_published
+                or post.pub_date > timezone.now()
+            )
+        ):
+            raise Http404("Пост недоступен")
+
+        return post
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['form'] = CreateCommentForm()
+        context['comments'] = (
+            self.object.comments
+            .select_related('author')
+            .all()
+        )
+        return context
+
+
 class CommentCreateView(LoginRequiredMixin, CreateView):
     """Написание комментариев"""
 
@@ -89,12 +123,19 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     form_class = CreateCommentForm
 
     def form_valid(self, form):
-        form.instance.post = get_object_or_404(Post, pk=self.kwargs['pk'])
+        form.instance.post = get_object_or_404(
+            Post,
+            pk=self.kwargs['post_pk']
+        )
         form.instance.author = self.request.user
-        return super().form_valid(form)
+        self.object = form.save()
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.kwargs['pk']})
+        return reverse(
+            'blog:post_detail',
+            kwargs={'post_pk': self.kwargs['post_pk']}
+        )
 
 
 class CommentDeleteView(
@@ -104,19 +145,22 @@ class CommentDeleteView(
 ):
     """Удаление комментариев"""
 
+    model = Comment
+    pk_url_kwarg = "comment_pk"
+    template_name = "blog/comment.html"
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(
+            Comment,
+            pk=self.kwargs["comment_pk"],
+            post__pk=self.kwargs["post_pk"]
+        )
+
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.kwargs['pk']})
-
-    def delete(self, request, *args, **kwargs):
-        comment = get_object_or_404(Comment, pk=self.kwargs['comment_pk'])
-        if self.request.user != comment.author:
-            return redirect('blog:post_detail', pk=self.kwargs['pk'])
-        return super().delete(request, *args, **kwargs)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.pop('form', None)
-        return context
+        return reverse(
+            "blog:post_detail",
+            kwargs={"post_pk": self.kwargs["post_pk"]}
+        )
 
 
 class CommentUpdateView(
@@ -126,17 +170,23 @@ class CommentUpdateView(
 ):
     """Изменение комментариев"""
 
+    model = Comment
     form_class = CreateCommentForm
+    pk_url_kwarg = "comment_pk"
+    template_name = "blog/comment.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        # безопасно получаем комментарий, иначе сразу 404
-        comment = get_object_or_404(Comment, pk=self.kwargs['comment_pk'])
-        if request.user != comment.author and not request.user.is_staff:
-            return redirect('blog:post_detail', pk=self.kwargs['pk'])
-        return super().dispatch(request, *args, **kwargs)
+    def get_object(self, queryset=None):
+        return get_object_or_404(
+            Comment,
+            pk=self.kwargs["comment_pk"],
+            post__pk=self.kwargs["post_pk"]
+        )
 
     def get_success_url(self):
-        return reverse('blog:post_detail', kwargs={'pk': self.kwargs['pk']})
+        return reverse(
+            "blog:post_detail",
+            kwargs={"post_pk": self.kwargs["post_pk"]}
+        )
 
 
 class EditProfileView(LoginRequiredMixin, UpdateView):
@@ -192,7 +242,6 @@ class BlogIndexListView(ListView):
 
     queryset = get_post_queryset(apply_filters=True, apply_annotation=True)
     template_name = 'blog/index.html'
-    context_object_name = 'post_list'
     paginate_by = PAGINATED_BY
 
 
@@ -200,7 +249,6 @@ class BlogCategoryListView(ListView):
     """Страница категории блога"""
 
     template_name = 'blog/category.html'
-    context_object_name = 'post_list'
     paginate_by = PAGINATED_BY
 
     def get_category(self):
@@ -221,42 +269,6 @@ class BlogCategoryListView(ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['category'] = self.get_category()
-        return context
-
-
-class PostDetailView(DetailView):
-    """Детальная страница поста"""
-
-    model = Post
-    template_name = 'blog/detail.html'
-    pk_url_kwarg = 'post_pk'
-
-    def get_object(self, queryset=None):
-        post = get_object_or_404(
-            Post.objects.select_related('author', 'location', 'category'),
-            pk=self.kwargs['post_pk']
-        )
-
-        # Проверяем доступность поста
-        if (
-            post.author != self.request.user and (
-                not post.is_published
-                or not post.category.is_published
-                or post.pub_date > timezone.now()
-            )
-        ):
-            raise Http404("Пост недоступен")
-
-        return post
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['form'] = CreateCommentForm()
-        context['comments'] = (
-            self.object.comments
-            .select_related('author')
-            .all()
-        )
         return context
 
 

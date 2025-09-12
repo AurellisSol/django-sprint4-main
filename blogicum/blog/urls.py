@@ -1,13 +1,25 @@
-from django.urls import URLPattern, path, include
+from django.urls import path, include
 
 from . import views
 
 app_name: str = 'blog'
 
 post_urls = [
-    path('create/', views.PostCreateView.as_view(), name='create_post'),
-    path('<int:post_pk>/', views.PostDetailView.as_view(), name='post_detail'),
-    path('<int:post_pk>/edit/', views.PostUpdateView.as_view(), name='edit_post'),
+    path(
+        'create/',
+        views.PostCreateView.as_view(),
+        name='create_post'
+    ),
+    path(
+        '<int:post_pk>/',
+        views.PostDetailView.as_view(),
+        name='post_detail'
+    ),
+    path(
+        '<int:post_pk>/edit/',
+        views.PostUpdateView.as_view(),
+        name='edit_post'
+    ),
     path(
         '<int:post_pk>/delete/',
         views.PostDeleteView.as_view(),
@@ -31,7 +43,11 @@ post_urls = [
 ]
 
 urlpatterns = [
-    path('', views.BlogIndexListView.as_view(), name='index'),
+    path(
+        '',
+        views.BlogIndexListView.as_view(),
+        name='index'
+    ),
     path(
         'category/<slug:category_slug>/',
         views.BlogCategoryListView.as_view(),
@@ -47,5 +63,8 @@ urlpatterns = [
         views.AuthorProfileListView.as_view(),
         name='profile'
     ),
-    path('posts/', include((post_urls, app_name))),
+    path(
+        'posts/',
+        include(post_urls)
+    ),
 ]

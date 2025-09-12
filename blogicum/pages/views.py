@@ -10,7 +10,7 @@ class RulesPageView(TemplateView):
     template_name = 'pages/rules.html'
 
 
-def csrf_failure(request, reason=''):
+def csrf_failure(request, reason=""):
     return render(request, 'pages/403csrf.html', status=403)
 
 

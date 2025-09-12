@@ -6,23 +6,15 @@ from .models import Post
 
 
 def get_post_queryset(apply_filters=False, apply_annotation=False):
-    """Базовый запрос для модели Post."""
-    queryset = Post.objects.select_related(
-        'author', 'location', 'category'
-    )
-
+    queryset = Post.objects.select_related('author', 'location', 'category')
     if apply_filters:
         queryset = queryset.filter(
             is_published=True,
+            category__is_published=True,
             pub_date__lte=timezone.now(),
-            category__is_published=True
         )
-
     if apply_annotation:
-        queryset = queryset.annotate(
-            comment_count=Count('comments')
-        ).order_by('-pub_date')
-
+        queryset = queryset.annotate(comment_count=Count('comments')).order_by('-pub_date')
     return queryset
 
 
