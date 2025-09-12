@@ -10,26 +10,26 @@ class CreatePostForm(forms.ModelForm):
         required=True,
         widget=forms.DateTimeInput(
             attrs={
-                "type": "datetime-local",
+                'type': 'datetime-local',
             },
-            format="%Y-%m-%dT%H:%M",
+            format='%Y-%m-%dT%H:%M',
         ),
     )
 
     class Meta:
         model = Post
         fields = (
-            "title",
-            "image",
-            "text",
-            "pub_date",
-            "location",
-            "category",
-            "is_published",
+            'title',
+            'image',
+            'text',
+            'pub_date',
+            'location',
+            'category',
+            'is_published',
         )
 
 
 class CreateCommentForm(forms.ModelForm):
     class Meta:
         model = Comment
-        fields = ("text",)
+        fields = ('text',)

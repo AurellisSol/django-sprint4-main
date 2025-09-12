@@ -17,21 +17,22 @@ def test_gitignore():
             f"{type(e).__name__}: {e}"
         )
     assert "sent_emails/" in gitignore, (
-        "Убедитесь, что директория `sent_emails/`, служащая для хранения"
-        " e-mail сообщений, указана в файле `.gitignore` в корне проекта."
+        "Убедитесь, что в файле `.gitignore` в корне проекта указана "
+        "директория `sent_emails/` для подключения файлового бэкенда "
+        "отправки e-mail сообщений."
     )
 
 
 def test_email_backend_settings():
     assert hasattr(
         settings, "EMAIL_BACKEND"
-    ), "Убедитесь, что в проекте задана настройка `EMAIL_BACKEND`."
+    ), "Убедитесь, что в настроек проекта задана настройка `EMAIL_BACKEND`."
     assert EmailBackend.__module__ in settings.EMAIL_BACKEND, (
-        "Убедитесь, что файловый бэкенд для отправки e-mail подключен с"
-        " помощью настройки `EMAIL_BACKEND`."
+        "Убедитесь, что с помощью настроки `EMAIL_BACKEND` подключен "
+        "файловый бэкенд для отправки e-mail."
     )
     excpect_email_file = settings.BASE_DIR / "sent_emails"
     assert getattr(settings, "EMAIL_FILE_PATH", "") == excpect_email_file, (
-        "Убедитесь, что в настройке `EMAIL_FILE_PATH` указан путь `BASE_DIR /"
-        " 'sent_emails'`."
+        "Убедитесь, что с помощью настроки `EMAIL_FILE_PATH` для "
+        "отправки e-mail задан файл `BASE_DIR / 'sent_emails'`."
     )

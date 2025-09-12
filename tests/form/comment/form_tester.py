@@ -1,7 +1,11 @@
-from form.delete_tester import DeleteTester
+from form.base_form_tester import BaseFormTester
 
 
-class DeleteCommentTester(DeleteTester):
+class CommentFormTester(BaseFormTester):
+    @property
+    def has_textarea(self):
+        return True
+
     @property
     def one_and_only_one(self):
         return "один и только один"
@@ -13,7 +17,3 @@ class DeleteCommentTester(DeleteTester):
     @property
     def of_which_obj(self):
         return "комментария"
-
-    @property
-    def redirect_to_page(self):
-        return "страницу публикации"

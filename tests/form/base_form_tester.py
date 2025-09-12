@@ -26,6 +26,7 @@ from django.forms import BaseForm
 from django.http import HttpResponse
 
 from conftest import (
+    ItemCreatedException,
     ItemNotCreatedException,
     restore_cleaned_data,
     TitledUrlRepr,
@@ -35,64 +36,21 @@ from form.base_tester import BaseTester
 
 
 class FormValidationException(Exception):
-    pass
-
-
-class FormTagMissingException(FormValidationException):
-    pass
-
-
-class FormMethodException(FormValidationException):
-    pass
-
-
-class TextareaMismatchException(FormValidationException):
-    pass
-
-
-class FormValidationException(Exception):
-    pass
-
-
-class ItemCreatedException(Exception):
-    pass
-
-
-class UnauthorizedEditException(Exception):
-    pass
-
-
-class UnauthenticatedEditException(Exception):
-    pass
-
-
-class AuthenticatedEditException(Exception):
-    pass
-
-
-class DatabaseCreationException(Exception):
-    pass
-
-
-class TextareaTagMissingException(Exception):
-    pass
+    ...
 
 
 class BaseFormTester(BaseTester):
     def __init__(
-        self,
-        response: HttpResponse,
-        *args,
-        ModelAdapter: ModelAdapterT,
-        **kwargs,
+        self, response: HttpResponse, *args, ModelAdapter: ModelAdapterT, **kwargs
     ):
         super().__init__(*args, **kwargs)
 
         soup = bs4.BeautifulSoup(response.content, features="html.parser")
 
         form_tag = soup.find("form")
-        if not form_tag:
-            raise FormTagMissingException()
+        assert (
+            form_tag
+        ), f"Убедитесь, что передаёте {self.to_which_page} {self.which_form}."
 
         self._form_tag = form_tag
         self._action = self._form_tag.get("action", "") or (
@@ -108,6 +66,22 @@ class BaseFormTester(BaseTester):
         ...
 
     @property
+    def what_form(self):
+        return f"форма для {self.of_which_action} {self.of_which_obj}"
+
+    @property
+    def which_form(self):
+        return f"форму для {self.of_which_action} {self.of_which_obj}"
+
+    @property
+    def in_which_form(self):
+        return f"в форме для {self.of_which_action} {self.of_which_obj}"
+
+    @property
+    def of_which_form(self):
+        return f"формы для {self.of_which_action} {self.of_which_obj}"
+
+    @property
     def unauthorized_edit_redirect_cbk(self):
         return None
 
@@ -115,74 +89,54 @@ class BaseFormTester(BaseTester):
     def anonymous_edit_redirect_cbk(self):
         return None
 
-    @abstractmethod
     def redirect_error_message(
         self, by_user: str, redirect_to_page: Union[TitledUrlRepr, str]
-    ) -> str:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def author_assignment_error_message(self) -> str:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def display_text_error_message(self) -> str:
-        raise NotImplementedError
-
-    @abstractmethod
-    def validation_error_message(self, student_form_fields_str: str) -> str:
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def item_not_created_assertion_msg(self):
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def wrong_author_assertion_msg(self):
-        raise NotImplementedError
-
-    def get_redirect_to_page_repr(self, redirect_to_page) -> str:
+    ):
         if isinstance(redirect_to_page, str):
             redirect_to_page_repr = redirect_to_page
         elif isinstance(redirect_to_page, tuple):  # expected TitledUrlRepr
-            (
-                redirect_pattern,
-                redirect_repr,
-            ), redirect_title = redirect_to_page
+            (redirect_pattern, redirect_repr), redirect_title = redirect_to_page
             redirect_to_page_repr = f"{redirect_title} ({redirect_repr})"
         else:
             raise AssertionError(
                 f"Unexpected value type `{type(redirect_to_page)}` "
-                "for `redirect_to_page`"
+                f"for `redirect_to_page`"
             )
-        return redirect_to_page_repr
+        return (
+            f"Убедитесь, что при отправке {self.of_which_form} "
+            f"{self.on_which_page} {by_user} "
+            f"он перенаправляется на {redirect_to_page_repr}."
+        )
 
-    @abstractmethod
-    def status_error_message(self, by_user: str) -> str:
-        raise NotImplementedError
+    def status_error_message(self, by_user: str):
+        return (
+            f"Убедитесь, что при отправке {self.of_which_form} "
+            f"{by_user} {self.of_which_obj} не возникает ошибок."
+        )
 
     @property
     def textarea_tag(self) -> bs4.Tag:
         textarea = self._form_tag.find("textarea")
-        if not textarea:
-            raise TextareaTagMissingException()
+        assert textarea, (
+            "Убедитесь, что создан элемент формы `textarea` "
+            f"для введения текста {self.of_which_obj} "
+            f"{self.in_which_form} {self.on_which_page}."
+        )
         return textarea
 
     def _validate(self):
-        if not self._form_tag:
-            raise FormTagMissingException()
-
-        if self._form_tag.get("method", "get").upper() != "POST":
-            raise FormMethodException()
-
+        assert (
+            self._form_tag
+        ), f"Убедитесь, что передаёте {self.to_which_page} {self.which_form}."
+        assert self._form_tag.get("method", "get").upper() == "POST", (
+            f"Убедитесь, что {self.what_form} {self.on_which_page} "
+            "отправляется методом `POST`."
+        )
         if self.has_textarea and self._item_adapter:
-            textarea = self.textarea_tag
-            if textarea.text.strip() != self._item_adapter.text.strip():
-                raise TextareaMismatchException()
+            assert self.textarea_tag.text.strip() == self._item_adapter.text.strip(), (
+                f"Убедитесь, что текст {self.of_which_obj} привязан к полю "
+                f"типа `textarea` {self.in_which_form} {self.on_which_page}."
+            )
 
     def try_create_item(
         self,
@@ -200,11 +154,13 @@ class BaseFormTester(BaseTester):
 
         restored_data = restore_cleaned_data(form.cleaned_data)
         try:
-            response = submitter.test_submit(
-                url=self._action, data=restored_data
-            )
+            response = submitter.test_submit(url=self._action, data=restored_data)
         except Exception as e:
-            raise FormValidationException(e) from e
+            raise AssertionError(
+                f"При создании {self.of_which_obj} {self.on_which_page} "
+                f"возникает ошибка:\n"
+                f"{type(e).__name__}: {e}"
+            )
 
         items_after: Set[Model] = set(qs.all())
         created_items = items_after - items_before
@@ -213,9 +169,9 @@ class BaseFormTester(BaseTester):
 
         if assert_created:
             if not n_created:
-                raise ItemNotCreatedException()
+                raise ItemNotCreatedException
         elif n_created:
-            raise ItemCreatedException()
+            raise ItemCreatedException(n_created)
 
         return response, created
 
@@ -237,21 +193,27 @@ class BaseFormTester(BaseTester):
             adapted_form_data = {}
             for k, v in unadapted_form_data.items():
                 adapted_form_data[getattr(model_adapter, k).field.name] = v
-            creation_forms.append(
-                self.init_create_item_form(Form, **adapted_form_data)
-            )
+            creation_forms.append(self.init_create_item_form(Form, **adapted_form_data))
 
         return creation_forms
 
-    def test_unlogged_cannot_create(
-        self, form: BaseForm, qs: QuerySet
-    ) -> None:
-        self.test_create_item(
-            form,
-            qs,
-            AnonymousSubmitTester(self, test_response_cbk=None),
-            assert_created=False,
-        )
+    def test_unlogged_cannot_create(self, form: BaseForm, qs: QuerySet) -> None:
+        try:
+            self.test_create_item(
+                form,
+                qs,
+                AnonymousSubmitTester(self, test_response_cbk=None),
+                assert_created=False,
+            )
+
+        except ItemCreatedException:
+            raise AssertionError(
+                f"Убедитесь, что {self.on_which_page} "
+                f"отправка {self.of_which_form} "
+                f"неаутентифицированным пользователем "
+                f"не создаёт объект {self.of_which_obj} в базе данных."
+            )
+        pass
 
     def test_create_item(
         self,
@@ -271,17 +233,24 @@ class BaseFormTester(BaseTester):
             ]
             student_form_fields_str = ", ".join(student_form_fields)
             raise AssertionError(
-                self.validation_error_message(student_form_fields_str)
+                f"Убедитесь, что для валидации {self.of_which_form} "
+                f"достаточно заполнения следующих полей: "
+                f"{student_form_fields_str}."
             )
         if assert_created:
-            assert (
-                self._ModelAdapter(created).author
-                == response.wsgi_request.user
-            ), self.author_assignment_error_message
+            assert self._ModelAdapter(created).author == response.wsgi_request.user, (
+                f"Убедитесь, что при создании {self.of_which_obj} "
+                f"{self.on_which_page} в поле автора {self.of_which_obj} "
+                "присваивается аутентифицированный пользователь."
+            )
             content = response.content.decode(encoding="utf8")
             if self._ModelAdapter(created).text in content:
                 if not assert_created:
-                    raise AssertionError(self.display_text_error_message)
+                    raise AssertionError(
+                        f"Убедитесь, что при создании {self.of_which_obj} "
+                        f"{self.on_which_page} текст {self.of_which_obj} "
+                        "отображается на странице ответа."
+                    )
 
         return response, created
 
@@ -297,21 +266,26 @@ class BaseFormTester(BaseTester):
                     AuthorisedSubmitTester(
                         self,
                         test_response_cbk=(
-                            AuthorisedSubmitTester.get_test_response_ok_cbk(
-                                tester=self
-                            )
+                            AuthorisedSubmitTester.get_test_response_ok_cbk(tester=self)
                         ),
                     ),
                     assert_created=True,
                 )
             except ItemNotCreatedException:
-                raise AssertionError(self.item_not_created_assertion_msg)
+                raise AssertionError(
+                    "Убедитесь, что при отправке "
+                    f"авторизованным пользователем {self.of_which_form} "
+                    f"{self.on_which_page}"
+                    f"в базе данных создаётся {self.one_and_only_one} "
+                    f"{self.which_obj}."
+                )
 
             created_items.append(created)
-            assert (
-                self._ModelAdapter(created).author
-                == response.wsgi_request.user
-            ), self.wrong_author_assertion_msg
+            assert self._ModelAdapter(created).author == response.wsgi_request.user, (
+                f"Убедитесь, что при создании {self.of_which_obj} "
+                f"{self.on_which_page} в поле автора {self.of_which_obj} "
+                "присваивается аутентифицированный пользователь."
+            )
 
         # noinspection PyUnboundLocalVariable
         return response, created_items
@@ -334,8 +308,7 @@ class BaseFormTester(BaseTester):
 
         # replace related objects with their ids for future validation
         form_data = {
-            k: v.id if isinstance(v, Model) else v
-            for k, v in form_data.items()
+            k: v.id if isinstance(v, Model) else v for k, v in form_data.items()
         }
 
         if file_data:
@@ -345,21 +318,17 @@ class BaseFormTester(BaseTester):
         result = Form(data=form_data, files=file_data)
         return result
 
-    @abstractmethod
-    def creation_assertion_msg(self, prop):
-        pass
-
-    def test_creation_response(
-        self, content: str, created_items: Iterable[Model]
-    ):
+    def test_creation_response(self, content: str, created_items: Iterable[Model]):
         for item in created_items:
             item_adapter = self._ModelAdapter(item)
             prop = item_adapter.item_cls_adapter.displayed_field_name_or_value
             if not self._ModelAdapter(item).text in content:
                 raise AssertionError(
-                    self.creation_assertion_msg(
-                        item_adapter.get_student_field_name(prop)
-                    )
+                    f"Убедитесь, что при создании {self.of_which_obj} "
+                    f"{self.on_which_page} правильно настроена "
+                    f"переадресация, и значение поля "
+                    f"`{item_adapter.get_student_field_name(prop)}` "
+                    "отображается на странице ответа."
                 )
 
     def test_edit_item(
@@ -370,15 +339,15 @@ class BaseFormTester(BaseTester):
         can_edit, _ = self.user_can_edit(
             self.another_user_client,
             submitter=UnauthorizedSubmitTester(
-                tester=self,
-                test_response_cbk=self.unauthorized_edit_redirect_cbk,
+                tester=self, test_response_cbk=self.unauthorized_edit_redirect_cbk
             ),
             item_adapter=item_adapter,
             updated_form=updated_form,
         )
-
-        if can_edit:
-            raise UnauthorizedEditException()
+        assert can_edit is not True, (
+            f"Убедитесь, что редактирование {self.of_which_obj} недоступно "
+            "неавторизованному пользователю."
+        )
 
         can_edit, _ = self.user_can_edit(
             self.unlogged_client,
@@ -388,33 +357,36 @@ class BaseFormTester(BaseTester):
             item_adapter=item_adapter,
             updated_form=updated_form,
         )
-
-        if can_edit:
-            raise UnauthenticatedEditException()
+        assert can_edit is not True, (
+            f"Убедитесь, что редактирование {self.of_which_obj} недоступно "
+            "неаутентифицированному пользователю."
+        )
 
         can_edit, response = self.user_can_edit(
             self.user_client,
             submitter=AuthorisedSubmitTester(
                 tester=self,
                 test_response_cbk=(
-                    AuthorisedSubmitTester.get_test_response_ok_cbk(
-                        tester=self
-                    )
+                    AuthorisedSubmitTester.get_test_response_ok_cbk(tester=self)
                 ),
             ),
             item_adapter=item_adapter,
             updated_form=updated_form,
         )
-
-        if not can_edit:
-            raise AuthenticatedEditException()
+        assert can_edit, (
+            f"Убедитесь, что авторизованному пользователю доступно "
+            f"редактирование {self.of_which_obj} и вносимые им "
+            f"изменения сохраняются."
+        )
 
         instances_after: Set[Model] = set(qs.all())
 
         created_instances_n = instances_after - instances_before
-
-        if len(created_instances_n) != 0:
-            raise DatabaseCreationException()
+        assert len(created_instances_n) == 0, (
+            f"Убедитесь, что при отправке {self.of_which_form} "
+            f"{self.on_which_page} в базе данных не создаётся "
+            f"{self.which_obj}."
+        )
 
         return response
 
@@ -424,9 +396,7 @@ class BaseFormTester(BaseTester):
         if not client:
             return None, None
         disp_old_value = item_adapter.displayed_field_name_or_value
-        response = submitter.test_submit(
-            url=self._action, data=updated_form.data
-        )
+        response = submitter.test_submit(url=self._action, data=updated_form.data)
         item_adapter.refresh_from_db()
         disp_new_value = item_adapter.displayed_field_name_or_value
         return disp_new_value != disp_old_value, response
@@ -460,19 +430,14 @@ class SubmitTester(ABC):
     ):
         if assert_status_in and response.status_code not in assert_status_in:
             raise AssertionError(err_msg)
-        if assert_status_not_in and (
-            response.status_code in assert_status_not_in
-        ):
+        if assert_status_not_in and (response.status_code in assert_status_not_in):
             raise AssertionError(err_msg)
         if assert_redirect is not None and assert_redirect:
             assert hasattr(response, "redirect_chain") and getattr(
                 response, "redirect_chain"
             ), err_msg
             if isinstance(assert_redirect, tuple):  # expected TitledUrlRepr
-                (
-                    redirect_pattern,
-                    redirect_repr,
-                ), redirect_title = assert_redirect
+                (redirect_pattern, redirect_repr), redirect_title = assert_redirect
                 redirect_match = False
                 for redirect_url, _ in response.redirect_chain:
                     if re.match(redirect_pattern, redirect_url):
@@ -495,9 +460,7 @@ class SubmitTester(ABC):
         )
 
     @staticmethod
-    def get_test_response_ok_cbk(
-        tester: BaseTester, by_user: Optional[str] = None
-    ):
+    def get_test_response_ok_cbk(tester: BaseTester, by_user: Optional[str] = None):
         by_user = by_user or "авторизованным пользователем"
         return partial(
             SubmitTester.test_response_cbk,
@@ -506,11 +469,16 @@ class SubmitTester(ABC):
         )
 
     @staticmethod
-    def get_test_response_404_cbk(err_msg: str):
+    def get_test_response_404_cbk(tester: BaseTester, by_user: Optional[str] = None):
+        by_user = by_user or "авторизованным пользователем"
         return partial(
             SubmitTester.test_response_cbk,
             assert_status_in=(HTTPStatus.NOT_FOUND,),
-            err_msg=err_msg,
+            err_msg=(
+                f"Убедитесь, что если {tester.which_obj} не существует, то "
+                f"при отправке запроса {by_user} {tester.to_which_page} "
+                f"возникает ошибка 404."
+            ),
         )
 
 
@@ -536,10 +504,14 @@ class AuthorisedSubmitTester(SubmitTester):
         )
 
     @staticmethod
-    def get_test_response_ok_cbk(
-        tester: BaseTester, by_user: Optional[str] = None
-    ):
+    def get_test_response_ok_cbk(tester: BaseTester, by_user: Optional[str] = None):
         return SubmitTester.get_test_response_ok_cbk(
+            tester=tester, by_user=by_user or "авторизованным пользователем"
+        )
+
+    @staticmethod
+    def get_test_response_404_cbk(tester: BaseTester, by_user: Optional[str] = None):
+        return SubmitTester.get_test_response_404_cbk(
             tester=tester, by_user=by_user or "авторизованным пользователем"
         )
 

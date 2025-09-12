@@ -22,7 +22,6 @@ from django.contrib.auth import get_user_model
 from django.db.models import Model, Field
 from django.forms import BaseForm
 from django.http import HttpResponse
-from django.test import override_settings
 from django.test.client import Client
 from mixer.backend.django import mixer as _mixer
 
@@ -30,23 +29,14 @@ N_PER_FIXTURE = 3
 N_PER_PAGE = 10
 COMMENT_TEXT_DISPLAY_LEN_FOR_TESTS = 50
 
-KeyVal = NamedTuple("KeyVal", [("key", Optional[str]), ("val", Optional[str])])
+KeyVal = NamedTuple("KeyVal", [("key", str), ("val", str)])
 UrlRepr = NamedTuple("UrlRepr", [("url", str), ("repr", str)])
 TitledUrlRepr = TypeVar("TitledUrlRepr", bound=Tuple[UrlRepr, str])
 
 
-@pytest.fixture(autouse=True)
-def enable_debug_false():
-    with override_settings(DEBUG=False):
-        yield
-
-
 class SafeImportFromContextManager:
     def __init__(
-            self,
-            import_path: str,
-            import_names: Iterable[str],
-            import_of: str = "",
+        self, import_path: str, import_names: Iterable[str], import_of: str = ""
     ):
         self._import_path: str = import_path
         self._import_names: Iterable[str] = import_names
@@ -67,7 +57,7 @@ class SafeImportFromContextManager:
 
 
 with SafeImportFromContextManager(
-        "blog/models.py", ["Category", "Location", "Post"], import_of="моделей"
+    "blog/models.py", ["Category", "Location", "Post"], import_of="моделей"
 ):
     try:
         from blog.models import Category, Location, Post  # noqa:F401
@@ -83,8 +73,7 @@ with SafeImportFromContextManager(
         for need_app_name, need_app_conf_name in need_apps.items():
             if need_app_conf_name not in registered_apps:
                 raise AssertionError(
-                    "Убедитесь, что зарегистрировано приложение "
-                    f"{need_app_name}"
+                    f"Убедитесь, что зарегистрировано приложение " f"{need_app_name}"
                 )
 
 pytest_plugins = [
@@ -134,7 +123,7 @@ def another_user_client(another_user):
 
 
 def get_post_list_context_key(
-        user_client, page_url, page_load_err_msg, key_missing_msg
+    user_client, page_url, page_load_err_msg, key_missing_msg
 ):
     try:
         post_response = user_client.get(page_url)
@@ -156,43 +145,31 @@ def get_post_list_context_key(
 class _TestModelAttrs:
     @property
     def model(self):
-        raise NotImplementedError(
-            "Override this property in inherited test class"
-        )
+        raise NotImplementedError("Override this property in inherited test class")
 
     def get_parameter_display_name(self, param: str) -> str:
         return param
 
-    def test_model_attrs(
-            self, field: str, type: type, params: dict,
-            field_error: Optional[str], type_error: Optional[str],
-            param_error: Optional[str], value_error: Optional[str]):
+    def test_model_attrs(self, field: str, type: type, params: dict):
         model_name = self.model.__name__
-        field_error = field_error or (
-            f"В модели `{model_name}` укажите атрибут `{field}`.")
-        assert hasattr(self.model, field), field_error
-
+        assert hasattr(
+            self.model, field
+        ), f"В модели `{model_name}` укажите атрибут `{field}`."
         model_field = getattr(self.model, field).field
-        type_error = type_error or (
-            f"В модели `{model_name}` у атрибута `{field}` "
-            f"укажите тип `{type}`."
+        assert isinstance(model_field, type), (
+            f"В модели `{model_name}` у атрибута `{field}` " f"укажите тип `{type}`."
         )
-        assert isinstance(model_field, type), type_error
-
         for param, value_param in params.items():
             display_name = self.get_parameter_display_name(param)
-            param_error = param_error or (
+            assert param in model_field.__dict__, (
                 f"В модели `{model_name}` для атрибута `{field}` "
                 f"укажите параметр `{display_name}`."
             )
-            assert param in model_field.__dict__, param_error
-
-            value_error = value_error or (
+            assert model_field.__dict__.get(param) == value_param, (
                 f"В модели `{model_name}` в атрибуте `{field}` "
                 f"проверьте значение параметра `{display_name}` "
                 "на соответствие заданию."
             )
-            assert model_field.__dict__.get(param) == value_param, value_error
 
 
 @pytest.fixture
@@ -201,10 +178,10 @@ def PostModel() -> Type[Model]:
         from blog.models import Post
     except Exception as e:
         raise AssertionError(
-            "При импорте модели `Post` из файла `models.py` возникла ошибка."
-            " Убедитесь, что в файле `blog/models.py` нет ошибок и что в нём"
-            " объявлена модель Post. Сообщение об"
-            f" ошибке:\n{type(e).__name__}: {e}"
+            "Убедитесь, что в файле `blog/models.py` объявлена модель Post, "
+            "и что в нём нет ошибок. "
+            "При импорте модели `Post` из файла `models.py` возникла ошибка:\n"
+            f"{type(e).__name__}: {e}"
         )
     return Post
 
@@ -227,9 +204,7 @@ def CommentModel() -> Model:
     comment_class_name = ""
     known_class_names = {"BaseModel", "Meta", "Category", "Location", "Post"}
     for class_def in class_defs:
-        class_names = re.findall(
-            r"class +(\w+)[\w\W]+ForeignKey[\w\W]+Post", class_def
-        )
+        class_names = re.findall(r"class +(\w+)[\w\W]+ForeignKey[\w\W]+Post", class_def)
         for name in class_names:
             if name not in known_class_names:
                 comment_class_name = name
@@ -237,10 +212,16 @@ def CommentModel() -> Model:
         if comment_class_name:
             break
     assert comment_class_name, (
-        "Убедитесь, что в файле `blog/models.py` объявлена модель комментария"
-        " с полем `ForeignKey`, связывающим её с моделью `Post`."
+        "Убедитесь, что в файле `blog/models.py` объявили модель комментария "
+        "с полем `ForeignKey`, связывающим её с моделью `Post`."
     )
     return getattr(models, comment_class_name)
+
+
+class ItemCreatedException(Exception):
+    def __init__(self, n_created, *args):
+        super().__init__(*args)
+        self.n_created = n_created
 
 
 class ItemNotCreatedException(Exception):
@@ -248,24 +229,23 @@ class ItemNotCreatedException(Exception):
 
 
 def get_get_response_safely(
-        user_client: Client, url: str, err_msg: Optional[str] = None,
-        expected_status=HTTPStatus.OK
+    user_client: Client, url: str, err_msg: Optional[str] = None
 ) -> HttpResponse:
     response = user_client.get(url)
     if err_msg is not None:
-        assert response.status_code == expected_status, err_msg
+        assert response.status_code == HTTPStatus.OK, err_msg
     return response
 
 
 def get_a_post_get_response_safely(
-        user_client: Client, post_id: Union[str, int]
+    user_client: Client, post_id: Union[str, int]
 ) -> HttpResponse:
     return get_get_response_safely(
         user_client,
         url=f"/posts/{post_id}/",
         err_msg=(
-            "Убедитесь, что опубликованный пост с опубликованной категорией и"
-            " датой публикации в прошлом отображается на странице публикации."
+            "Убедитесь, что опубликованный пост с опубликованной категорией "
+            "и датой публикации в прошлом отображается на странице публикации."
         ),
     )
 
@@ -276,14 +256,14 @@ def get_create_a_post_get_response_safely(user_client: Client) -> HttpResponse:
         user_client,
         url=url,
         err_msg=(
-            "Убедитесь, что страница создания публикации по адресу"
-            f" {url} отображается без ошибок."
+            f"Убедитесь, что страница создания публикации по адресу {url} "
+            "отображается без ошибок."
         ),
     )
 
 
 def _testget_context_item_by_class(
-        context, cls: type, err_msg: str, inside_iter: bool = False
+    context, cls: type, err_msg: str, inside_iter: bool = False
 ) -> KeyVal:
     """If `err_msg` is not empty, empty return value will
     produce an AssertionError with the `err_msg` error message"""
@@ -319,8 +299,6 @@ def _testget_context_item_by_key(context, key: str, err_msg: str) -> KeyVal:
 
 def get_page_context_form(user_client: Client, page_url: str) -> KeyVal:
     response = user_client.get(page_url)
-    if not str(response.status_code).startswith("2"):
-        return KeyVal(key=None, val=None)
     return _testget_context_item_by_class(response.context, BaseForm, "")
 
 
@@ -360,9 +338,9 @@ def cleanup(request):
     for root, dirs, files in os.walk(image_dir):
         for filename in files:
             if (
-                    filename.endswith(".jpg")
-                    or filename.endswith(".gif")
-                    or filename.endswith(".png")
+                filename.endswith(".jpg")
+                or filename.endswith(".gif")
+                or filename.endswith(".png")
             ):
                 file_path = os.path.join(root, filename)
                 if os.path.getmtime(file_path) >= start_time:

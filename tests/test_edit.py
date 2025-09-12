@@ -8,11 +8,7 @@ from django.http import HttpResponse
 
 from fixtures.types import ModelAdapterT
 from form.base_form_tester import BaseFormTester
-from conftest import (
-    KeyVal,
-    get_get_response_safely,
-    _testget_context_item_by_class,
-)
+from conftest import KeyVal, get_get_response_safely, _testget_context_item_by_class
 
 
 def _test_edit(
@@ -32,9 +28,7 @@ def _test_edit(
 
     def create_updated_form(**updated_props):
         response = user_client.get(edit_url)
-        _, form = _testget_context_item_by_class(
-            response.context, BaseForm, ""
-        )
+        _, form = _testget_context_item_by_class(response.context, BaseForm, "")
         return EditFormTester.init_create_form_from_item(
             item,
             form.__class__,
