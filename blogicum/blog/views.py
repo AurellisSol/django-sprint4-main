@@ -1,6 +1,8 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
+from django.template import TemplateDoesNotExist
+from django.conf import settings
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -10,7 +12,7 @@ from django.views.generic import (
     FormView,
 )
 from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import login
+from django.contrib.auth import login, logout as django_logout 
 from django.http import Http404, HttpResponseRedirect
 from django.utils import timezone
 
@@ -273,3 +275,6 @@ class RegistrationView(FormView):
         user = form.save()
         login(self.request, user)
         return redirect('blog:profile', username=user.username)
+
+
+

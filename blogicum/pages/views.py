@@ -1,5 +1,8 @@
-from django.shortcuts import render
 from django.views.generic import TemplateView
+from django.contrib.auth import logout as django_logout
+from django.conf import settings
+from django.shortcuts import render, redirect
+from django.template import TemplateDoesNotExist
 
 
 class AboutPageView(TemplateView):
@@ -20,3 +23,4 @@ def page_not_found(request, exception):
 
 def server_error(request):
     return render(request, 'pages/500.html', status=500)
+
