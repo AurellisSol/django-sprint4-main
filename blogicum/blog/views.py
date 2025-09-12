@@ -12,6 +12,7 @@ from django.views.generic import (
 )
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
+from django.utils import timezone
 
 from .forms import CreateCommentForm, CreatePostForm
 from .models import Category, Comment, Post, User
@@ -27,9 +28,11 @@ class PostDeleteView(PostsEditMixin, LoginRequiredMixin, AuthorOrStaffRequiredMi
 class PostUpdateView(PostsEditMixin, LoginRequiredMixin, AuthorOrStaffRequiredMixin, UpdateView):
     form_class = CreatePostForm
 
-    def get_success_url(self):
-        return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
-
+    def dispatch(self, request, *args, **kwargs):
+        post = get_object_or_404(Post, pk=self.kwargs["pk"])
+        if self.request.user != post.author:
+            return redirect("blog:post_detail", pk=self.kwargs["pk"])
+        return super().dispatch(request, *args, **kwargs)
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -62,7 +65,7 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
         return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
 
 
-class CommentDeleteView(CommentEditMixin, LoginRequiredMixin, DeleteView):
+class CommentDeleteView(CommentEditMixin, LoginRequiredMixin, AuthorOrStaffRequiredMixin, DeleteView):
     def get_success_url(self):
         return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
 
@@ -73,20 +76,19 @@ class CommentDeleteView(CommentEditMixin, LoginRequiredMixin, DeleteView):
         return super().delete(request, *args, **kwargs)
 
 
-class CommentUpdateView(CommentEditMixin, LoginRequiredMixin, UpdateView):
+class CommentUpdateView(CommentEditMixin, LoginRequiredMixin, AuthorOrStaffRequiredMixin, UpdateView):
     form_class = CreateCommentForm
 
     def dispatch(self, request, *args, **kwargs):
-        if (
-            self.request.user
-            != Comment.objects.get(pk=self.kwargs["comment_pk"]).author
-        ):
+        # безопасно получаем комментарий, иначе сразу 404
+        comment = get_object_or_404(Comment, pk=self.kwargs["comment_pk"])
+        if request.user != comment.author and not request.user.is_staff:
             return redirect("blog:post_detail", pk=self.kwargs["pk"])
-
         return super().dispatch(request, *args, **kwargs)
 
     def get_success_url(self):
         return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
+
 
 
 class EditProfileView(LoginRequiredMixin, UpdateView):
@@ -172,22 +174,28 @@ class PostDetailView(PostsQuerySetMixin, DetailView):
     model = Post
     template_name = "blog/detail.html"
 
+    def get_queryset(self):
+        queryset = super().get_queryset().prefetch_related("comments")
+        if self.request.user.is_authenticated:
+            # если автор — возвращаем все его посты
+            return queryset.filter(author=self.request.user) | queryset.filter(
+                is_published=True,
+                pub_date__lte=timezone.now()
+            )
+        # остальные видят только опубликованные
+        return queryset.filter(
+            is_published=True,
+            pub_date__lte=timezone.now()
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["form"] = CreateCommentForm()
         context["comments"] = (
-            self.get_object().comments.prefetch_related("author").all()
+            self.get_object().comments.select_related("author").all()
         )
         return context
 
-    def get_queryset(self):
-        return (
-            super()
-            .get_queryset()
-            .prefetch_related(
-                "comments",
-            )
-        )
 
 class RegistrationView(FormView):
     form_class = UserCreationForm

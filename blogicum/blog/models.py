@@ -36,9 +36,8 @@ class BaseModel(models.Model):
         default=True,
         help_text="Снимите галочку, чтобы скрыть публикацию.",
     )
-    created_at = models.DateTimeField(
-        verbose_name="Добавлено", auto_now_add=True, auto_now=False
-    )
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Добавлено")
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="Дата обновления")
 
     class Meta:
         abstract = True
@@ -47,6 +46,7 @@ class BaseModel(models.Model):
 class Category(BaseModel):
     title = models.CharField(max_length=256, verbose_name="Заголовок")
     description = models.TextField(verbose_name="Описание")
+    
     slug = models.SlugField(
         verbose_name="Идентификатор",
         help_text=(

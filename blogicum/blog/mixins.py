@@ -1,10 +1,10 @@
 from .models import Comment, Post
-from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
 
 
 class PostsQuerySetMixin:
     def get_queryset(self):
-        return Post.post_list
+        return Post.objects.select_related("author", "location", "category")
 
 
 class PostsEditMixin:
@@ -25,4 +25,5 @@ class AuthorOrStaffRequiredMixin:
         obj = self.get_object()
         if request.user == obj.author or request.user.is_staff:
             return super().dispatch(request, *args, **kwargs)
-        raise PermissionDenied
+        return redirect("blog:post_detail", pk=obj.pk)
+
