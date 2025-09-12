@@ -92,45 +92,43 @@ class Location(BaseModel):
 
 
 class Post(BaseModel):
-    title = models.CharField(
-        max_length=MAX_TITLE_LENGTH,
-        verbose_name='Заголовок'
-    )
-    text = models.TextField(verbose_name='Текст')
+    """Публикация."""
+
+    title = models.CharField('Заголовок', max_length=256)
+    text = models.TextField('Текст')
+    image = models.ImageField(
+        'Изображение', upload_to='posts_images', blank=True, null=True)
     pub_date = models.DateTimeField(
-        default=timezone.now,
-        verbose_name='Дата и время публикации',
-        help_text=(
-            'Если установить дату и время в будущем — можно делать '
-            'отложенные публикации.'
-        ),
-    )
+        'Дата и время публикации',
+        help_text='Если установить дату и время в будущем — можно делать '
+                  'отложенные публикации.')
     author = models.ForeignKey(
         User,
-        verbose_name='Автор публикации',
         on_delete=models.CASCADE,
+        verbose_name='Автор публикации'
     )
     location = models.ForeignKey(
         Location,
-        verbose_name='Местоположение',
         on_delete=models.SET_NULL,
+        blank=True,
         null=True,
+        verbose_name='Местоположение'
     )
     category = models.ForeignKey(
         Category,
-        verbose_name='Категория',
         on_delete=models.SET_NULL,
         null=True,
+        verbose_name='Категория'
     )
-    image = models.ImageField('Изображение', blank=True, upload_to='img/')
-    objects = PostManager()
-    all_objects = models.Manager()
 
     class Meta:
         verbose_name = 'публикация'
         verbose_name_plural = 'Публикации'
         ordering = ('-pub_date',)
         default_related_name = 'posts'
+
+    def __str__(self):
+        return self.title[:50]
 
 
 class Comment(models.Model):

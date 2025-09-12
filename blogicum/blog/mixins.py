@@ -18,11 +18,15 @@ def get_post_queryset(apply_filters=False, apply_annotation=False):
     return queryset
 
 
-class AuthorOrStaffRequiredMixin:
-    """Доступ разрешён только автору или админу."""
+class AuthorRequiredMixin:
+    """Доступ разрешён только автору, все остальные — редирект."""
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect('blog:post_detail', post_pk=kwargs.get('post_pk'))
+
         obj = self.get_object()
         if request.user == obj.author:
             return super().dispatch(request, *args, **kwargs)
+
         return redirect('blog:post_detail', post_pk=kwargs.get('post_pk'))

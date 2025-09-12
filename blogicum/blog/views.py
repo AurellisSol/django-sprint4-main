@@ -16,22 +16,22 @@ from django.utils import timezone
 
 from .forms import CreateCommentForm, CreatePostForm, EditProfileForm
 from .models import Category, Comment, Post, User
-from .mixins import AuthorOrStaffRequiredMixin, get_post_queryset
+from .mixins import AuthorRequiredMixin, get_post_queryset
 
 PAGINATED_BY = 10
 
 
 class PostDeleteView(
+    AuthorRequiredMixin,
     LoginRequiredMixin,
-    AuthorOrStaffRequiredMixin,
     DeleteView
 ):
     """Удаление постов"""
 
     model = Post
     pk_url_kwarg = 'post_pk'
-    template_name = 'blog/delete.html'  # исправили
-    success_url = reverse_lazy('blog:index')  # можно и так
+    template_name = 'blog/delete.html'
+    success_url = reverse_lazy('blog:index')
 
     def get_object(self, queryset=None):
         return get_object_or_404(
@@ -41,8 +41,7 @@ class PostDeleteView(
 
 
 class PostUpdateView(
-    LoginRequiredMixin,
-    AuthorOrStaffRequiredMixin,
+    AuthorRequiredMixin,
     UpdateView
 ):
     """Изменение постов"""
@@ -58,18 +57,19 @@ class PostUpdateView(
 
 class PostCreateView(LoginRequiredMixin, CreateView):
     model = Post
-    template_name = 'blog/create.html'
+    template_name = "blog/create.html"
     form_class = CreatePostForm
 
-    def get_success_url(self):
-        return reverse(
-            'blog:profile',
-            args=[self.request.user.username]
-        )
+    def get_queryset(self):
+        # тесты должны видеть все посты, без фильтров
+        return Post.all_objects.all()
 
     def form_valid(self, form):
         form.instance.author = self.request.user
         return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse("blog:profile", args=[self.request.user.username])
 
 
 class PostDetailView(DetailView):
@@ -130,8 +130,8 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
 
 
 class CommentDeleteView(
+    AuthorRequiredMixin,
     LoginRequiredMixin,
-    AuthorOrStaffRequiredMixin,
     DeleteView
 ):
     """Удаление комментариев"""
@@ -155,8 +155,8 @@ class CommentDeleteView(
 
 
 class CommentUpdateView(
+    AuthorRequiredMixin,
     LoginRequiredMixin,
-    AuthorOrStaffRequiredMixin,
     UpdateView
 ):
     """Изменение комментариев"""

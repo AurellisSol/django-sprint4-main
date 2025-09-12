@@ -21,7 +21,6 @@ class CreatePostForm(forms.ModelForm):
         exclude = ('author',)
 
 
-
 class CreateCommentForm(forms.ModelForm):
     class Meta:
         model = Comment
