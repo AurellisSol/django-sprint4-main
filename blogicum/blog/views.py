@@ -275,19 +275,28 @@ class RegistrationView(FormView):
         return redirect("blog:profile", username=user.username)
 
 
-class AddCommentView(LoginRequiredMixin, View):
-    def post(self, request, post_id):
-        post = get_object_or_404(Post, id=post_id)
-        
-        # Дополнительная проверка на публикацию
-        if not post.is_published:
-            raise Http404("Пост не опубликован")
-            
-        form = CommentForm(request.POST)
-        if form.is_valid():
-            comment = form.save(commit=False)
-            comment.post = post
-            comment.author = request.user
-            comment.save()
-        
-        return redirect('blog:post_detail', pk=post_id)
+class AddCommentView(CreateView):
+    model = Comment
+    form_class = CommentForm
+
+    def dispatch(self, request, *args, **kwargs):
+        # Проверяем, что пост существует
+        self.post = get_object_or_404(Post, pk=kwargs["post_id"])
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user
+        form.instance.post = self.post
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        # Если форма невалидна — возвращаем 404 для несуществующего поста
+        if not Post.objects.filter(pk=self.kwargs["post_id"]).exists():
+            from django.http import Http404
+            raise Http404("Пост не найден")
+        return super().form_invalid(form)
+
+    def get_success_url(self):
+        return reverse_lazy("blog:post_detail", kwargs={"post_id": self.post.pk})
+
+
