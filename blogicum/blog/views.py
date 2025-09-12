@@ -30,19 +30,13 @@ class PostDeleteView(
 
     model = Post
     pk_url_kwarg = 'post_pk'
-    template_name = 'blog/create.html'
-    success_url = reverse_lazy('blog:index')
+    template_name = 'blog/delete.html'  # исправили
+    success_url = reverse_lazy('blog:index')  # можно и так
 
     def get_object(self, queryset=None):
         return get_object_or_404(
             Post,
             pk=self.kwargs['post_pk']
-        )
-
-    def get_success_url(self):
-        return reverse(
-            'blog:post_detail',
-            kwargs={'post_pk': self.kwargs['post_pk']}
         )
 
 
@@ -63,22 +57,19 @@ class PostUpdateView(
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
-    """создание постов"""
-
     model = Post
-    form_class = CreatePostForm
     template_name = 'blog/create.html'
+    form_class = CreatePostForm
+
+    def get_success_url(self):
+        return reverse(
+            'blog:profile',
+            args=[self.request.user.username]
+        )
 
     def form_valid(self, form):
         form.instance.author = self.request.user
         return super().form_valid(form)
-
-    def get_success_url(self):
-        # после создания — редирект в профиль автора
-        return reverse(
-            'blog:profile',
-            kwargs={'username': self.request.user.username},
-        )
 
 
 class PostDetailView(DetailView):

@@ -9,12 +9,9 @@ User = get_user_model()
 
 class CreatePostForm(forms.ModelForm):
     pub_date = forms.DateTimeField(
-        initial=timezone.now,
-        required=True,
+        required=False,
         widget=forms.DateTimeInput(
-            attrs={
-                'type': 'datetime-local',
-            },
+            attrs={'type': 'datetime-local'},
             format='%Y-%m-%dT%H:%M',
         ),
     )
@@ -22,6 +19,7 @@ class CreatePostForm(forms.ModelForm):
     class Meta:
         model = Post
         exclude = ('author',)
+
 
 
 class CreateCommentForm(forms.ModelForm):

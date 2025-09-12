@@ -124,6 +124,7 @@ class Post(BaseModel):
     )
     image = models.ImageField('Изображение', blank=True, upload_to='img/')
     objects = PostManager()
+    all_objects = models.Manager()
 
     class Meta:
         verbose_name = 'публикация'
