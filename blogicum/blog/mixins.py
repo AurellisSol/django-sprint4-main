@@ -26,4 +26,3 @@ class AuthorOrStaffRequiredMixin:
         if request.user == obj.author or request.user.is_staff:
             return super().dispatch(request, *args, **kwargs)
         return redirect("blog:post_detail", pk=obj.pk)
-
