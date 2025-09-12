@@ -8,49 +8,44 @@ from django.views.generic import (
     DetailView,
     ListView,
     UpdateView,
+    FormView,
 )
+from django.contrib.auth.forms import UserCreationForm
+from django.contrib.auth import login
 
 from .forms import CreateCommentForm, CreatePostForm
 from .models import Category, Comment, Post, User
-from .mixins import CommentEditMixin, PostsEditMixin, PostsQuerySetMixin
+from .mixins import CommentEditMixin, PostsEditMixin, PostsQuerySetMixin, AuthorOrStaffRequiredMixin
 
 PAGINATED_BY = 10
 
 
-class PostDeleteView(PostsEditMixin, LoginRequiredMixin, DeleteView):
+class PostDeleteView(PostsEditMixin, LoginRequiredMixin, AuthorOrStaffRequiredMixin, DeleteView):
     success_url = reverse_lazy("blog:index")
 
-    def delete(self, request, *args, **kwargs):
-        post = get_object_or_404(Post, pk=self.kwargs["pk"])
-        if self.request.user != post.author:
-            return redirect("blog:index")
 
-        return super().delete(request, *args, **kwargs)
-
-
-class PostUpdateView(PostsEditMixin, LoginRequiredMixin, UpdateView):
+class PostUpdateView(PostsEditMixin, LoginRequiredMixin, AuthorOrStaffRequiredMixin, UpdateView):
     form_class = CreatePostForm
 
-    def dispatch(self, request, *args, **kwargs):
-        post = get_object_or_404(Post, pk=self.kwargs["pk"])
-        if self.request.user != post.author:
-            return redirect("blog:post_detail", pk=self.kwargs["pk"])
-        return super().dispatch(request, *args, **kwargs)
+    def get_success_url(self):
+        return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
 
 
-class PostCreateView(PostsEditMixin, LoginRequiredMixin, CreateView):
+
+class PostCreateView(LoginRequiredMixin, CreateView):
+    model = Post
     form_class = CreatePostForm
+    template_name = "blog/create.html"
 
     def form_valid(self, form):
         form.instance.author = self.request.user
         return super().form_valid(form)
 
-    def get_success_url(self) -> str:
+    def get_success_url(self):
+        # после создания — редирект в профиль автора
         return reverse(
             "blog:profile",
-            kwargs={
-                "username": self.request.user.username,
-            },
+            kwargs={"username": self.request.user.username},
         )
 
 
@@ -93,6 +88,19 @@ class CommentUpdateView(CommentEditMixin, LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse("blog:post_detail", kwargs={"pk": self.kwargs["pk"]})
 
+
+class EditProfileView(LoginRequiredMixin, UpdateView):
+    model = User
+    fields = ["first_name", "last_name", "email"]
+    template_name = "blog/user.html"
+    success_url = reverse_lazy("index")
+
+    def get_object(self, queryset=None):
+        return self.request.user
+
+    def get_success_url(self):
+        return reverse("blog:profile", kwargs={"username": self.request.user.username})
+    
 
 class AuthorProfileListView(PostsQuerySetMixin, ListView):
     model = Post
@@ -180,3 +188,12 @@ class PostDetailView(PostsQuerySetMixin, DetailView):
                 "comments",
             )
         )
+
+class RegistrationView(FormView):
+    form_class = UserCreationForm
+    template_name = "registration/registration_form.html"
+
+    def form_valid(self, form):
+        user = form.save()
+        login(self.request, user)
+        return redirect("blog:profile", username=user.username)
