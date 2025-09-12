@@ -19,7 +19,7 @@ class PostsEditMixin:
 
 class CommentEditMixin:
     """Определяет модель, pk параметр и шаблон"""
-    
+
     model = Comment
     pk_url_kwarg = 'comment_pk'
     template_name = 'blog/comment.html'
