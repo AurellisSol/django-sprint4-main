@@ -1,8 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.shortcuts import get_object_or_404, redirect, render
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
-from django.template import TemplateDoesNotExist
-from django.conf import settings
 from django.views.generic import (
     CreateView,
     DeleteView,
@@ -11,8 +9,7 @@ from django.views.generic import (
     UpdateView,
     FormView,
 )
-from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth import login, logout as django_logout 
+from django.contrib.auth.forms import UserCreationForm 
 from django.http import Http404, HttpResponseRedirect
 from django.utils import timezone
 
@@ -31,30 +28,24 @@ class PostDeleteView(
     """Удаление постов"""
 
     model = Post
-    pk_url_kwarg = 'post_pk'
+    pk_url_kwarg = 'pk'
     template_name = 'blog/delete.html'
     success_url = reverse_lazy('blog:index')
 
     def get_object(self, queryset=None):
         return get_object_or_404(
             Post,
-            pk=self.kwargs['post_pk']
+            pk=self.kwargs[self.pk_url_kwarg]
         )
 
 
-class PostUpdateView(
-    AuthorRequiredMixin,
-    UpdateView
-):
-    """Изменение постов"""
-
+class PostUpdateView(AuthorRequiredMixin, LoginRequiredMixin, UpdateView):
     model = Post
-    pk_url_kwarg = 'post_pk'
     form_class = CreatePostForm
     template_name = 'blog/create.html'
 
-    def get_queryset(self):
-        return get_post_queryset().filter(author=self.request.user)
+    def get_success_url(self):
+        return reverse('blog:post_detail', args=[self.object.pk])
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -79,12 +70,11 @@ class PostDetailView(DetailView):
 
     model = Post
     template_name = 'blog/detail.html'
-    pk_url_kwarg = 'post_pk'
 
     def get_object(self, queryset=None):
         post = get_object_or_404(
             Post.objects.select_related('author', 'location', 'category'),
-            pk=self.kwargs['post_pk']
+            pk=self.kwargs.get(self.pk_url_kwarg)
         )
 
         if (
@@ -97,6 +87,7 @@ class PostDetailView(DetailView):
             raise Http404("Пост недоступен")
 
         return post
+
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -118,7 +109,7 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         form.instance.post = get_object_or_404(
             Post,
-            pk=self.kwargs['post_pk']
+            post__pk=self.kwargs["pk"]
         )
         form.instance.author = self.request.user
         self.object = form.save()
@@ -127,7 +118,7 @@ class CommentCreateView(LoginRequiredMixin, CreateView):
     def get_success_url(self):
         return reverse(
             'blog:post_detail',
-            kwargs={'post_pk': self.kwargs['post_pk']}
+            kwargs={"pk": self.kwargs["pk"]}
         )
 
 
@@ -146,13 +137,18 @@ class CommentDeleteView(
         return get_object_or_404(
             Comment,
             pk=self.kwargs["comment_pk"],
-            post__pk=self.kwargs["post_pk"]
+            post__pk=self.kwargs["pk"]
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.pop("form", None)  # убираем форму из контекста
+        return context
 
     def get_success_url(self):
         return reverse(
             "blog:post_detail",
-            kwargs={"post_pk": self.kwargs["post_pk"]}
+            kwargs={"pk": self.kwargs["pk"]}
         )
 
 
@@ -180,6 +176,7 @@ class CommentUpdateView(
             "blog:post_detail",
             kwargs={"post_pk": self.kwargs["post_pk"]}
         )
+
 
 
 class EditProfileView(LoginRequiredMixin, UpdateView):
@@ -275,6 +272,3 @@ class RegistrationView(FormView):
         user = form.save()
         login(self.request, user)
         return redirect('blog:profile', username=user.username)
-
-
-
