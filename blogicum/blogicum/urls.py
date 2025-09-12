@@ -12,8 +12,8 @@ handler500 = 'pages.views.server_error'
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('auth/', include('django.contrib.auth.urls')),
-    path('', include('blog.urls')),
-    path('pages/', include('pages.urls')),
+    path("", include("blog.urls", namespace="blog")),
+    path("pages/", include("pages.urls", namespace="pages")),
     path(
         'auth/registration/',
         views.RegistrationView.as_view(),

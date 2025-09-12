@@ -1,7 +1,7 @@
 from django.shortcuts import redirect
 from django.db.models import Count
 from django.utils import timezone
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.core.exceptions import PermissionDenied
 
 from .models import Post
 
@@ -19,14 +19,12 @@ def get_post_queryset(apply_filters=False, apply_annotation=False):
     return queryset
 
 
-class AuthorRequiredMixin(LoginRequiredMixin):
+class AuthorRequiredMixin:
+    """Миксин, запрещающий редактировать чужой контент"""
+
     def dispatch(self, request, *args, **kwargs):
         post = self.get_object()
-        if not request.user.is_authenticated:
-            # если пользователь не авторизован — редиректим на сам пост
-            return redirect("blog:post_detail", pk=post.pk)
-        if post.author != request.user:
-            # если автор не совпадает — тоже редиректим на пост
-            return redirect("blog:post_detail", pk=post.pk)
+        if not request.user.is_authenticated or post.author != request.user:
+            return redirect("blog:post_detail", post_pk=post.pk)
         return super().dispatch(request, *args, **kwargs)
 
