@@ -33,3 +33,14 @@ class CreateCommentForm(forms.ModelForm):
     class Meta:
         model = Comment
         fields = ('text',)
+
+
+class EditProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email']
+        widgets = {
+            'first_name': forms.TextInput(attrs={'placeholder': 'Имя'}),
+            'last_name': forms.TextInput(attrs={'placeholder': 'Фамилия'}),
+            'email': forms.EmailInput(attrs={'placeholder': 'example@mail.com'}),
+        }

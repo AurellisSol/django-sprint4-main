@@ -12,45 +12,56 @@ from django.views.generic import (
 )
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login
-from django.utils import timezone
+from django.http import Http404
 
 
-from .forms import CreateCommentForm, CreatePostForm
+from .forms import CreateCommentForm, CreatePostForm, EditProfileForm
 from .models import Category, Comment, Post, User
-from .mixins import (
-    CommentEditMixin, PostsEditMixin,
-    PostsQuerySetMixin, AuthorOrStaffRequiredMixin
-)
+from .mixins import AuthorOrStaffRequiredMixin, get_post_queryset
 
 PAGINATED_BY = 10
 
 
 class PostDeleteView(
-    PostsEditMixin,
     LoginRequiredMixin,
     AuthorOrStaffRequiredMixin,
     DeleteView
 ):
     """Удаление постов"""
 
+    model = Post
+    pk_url_kwarg = 'post_pk'
+    template_name = 'blog/create.html'
     success_url = reverse_lazy('blog:index')
+
+    def get_object(self, queryset=None):
+        return get_object_or_404(
+            Comment,
+            pk=self.kwargs['comment_pk'],
+            post__pk=self.kwargs['post_pk']
+        )
+
+    def get_success_url(self):
+        return reverse(
+            'blog:post_detail',
+            kwargs={'post_pk': self.kwargs['post_pk']}
+        )
 
 
 class PostUpdateView(
-    PostsEditMixin,
     LoginRequiredMixin,
     AuthorOrStaffRequiredMixin,
     UpdateView
 ):
     """Изменение постов"""
 
+    model = Post
+    pk_url_kwarg = 'post_pk'
     form_class = CreatePostForm
+    template_name = 'blog/create.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        post = get_object_or_404(Post, pk=self.kwargs['pk'])
-        if self.request.user != post.author:
-            return redirect('blog:post_detail', pk=self.kwargs['pk'])
-        return super().dispatch(request, *args, **kwargs)
+    def get_queryset(self):
+        return get_post_queryset().filter(author=self.request.user)
 
 
 class PostCreateView(LoginRequiredMixin, CreateView):
@@ -135,127 +146,109 @@ class EditProfileView(LoginRequiredMixin, UpdateView):
     """Изменение профиля"""
 
     model = User
-    fields = ['first_name', 'last_name', 'email']
+    form_class = EditProfileForm
     template_name = 'blog/user.html'
-    success_url = reverse_lazy('index')
 
     def get_object(self, queryset=None):
         return self.request.user
 
     def get_success_url(self):
-        return reverse(
-            'blog:profile',
-            kwargs={'username': self.request.user.username}
-        )
+        return reverse('blog:profile', kwargs={'username': self.request.user.username})
 
 
-class AuthorProfileListView(PostsQuerySetMixin, ListView):
+class AuthorProfileListView(ListView):
     model = Post
     template_name = 'blog/profile.html'
     paginate_by = PAGINATED_BY
 
-    def get_queryset(self):
-        if self.request.user.username == self.kwargs['username']:
-            return (
-                self.request.user.posts.select_related(
-                    'category',
-                    'author',
-                    'location',
-                )
-                .all()
-                .annotate(comment_count=Count('comments'))
-                .order_by('-pub_date')
-            )
+    def get_profile_user(self):
+        """Возвращает пользователя профиля или 404"""
+        return get_object_or_404(User, username=self.kwargs['username'])
 
-        return (
-            super()
-            .get_queryset()
-            .filter(author__username=self.kwargs['username'])
-            .annotate(comment_count=Count('comments'))
-            .order_by('-pub_date')
-        )
+    def get_queryset(self):
+        profile_user = self.get_profile_user()
+
+        if self.request.user == profile_user:
+            queryset = get_post_queryset(apply_filters=False, apply_annotation=True)
+        else:
+            queryset = get_post_queryset(apply_filters=True, apply_annotation=True)
+
+        return queryset.filter(author=profile_user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['profile'] = get_object_or_404(
-            User, username=self.kwargs['username']
-        )
+        context['profile'] = self.get_profile_user()
         return context
 
 
-class BlogIndexListView(PostsQuerySetMixin, ListView):
+class BlogIndexListView(ListView):
     """Главная страница блога"""
 
-    model = Post
+    queryset = get_post_queryset(apply_filters=True, apply_annotation=True)
     template_name = 'blog/index.html'
     context_object_name = 'post_list'
     paginate_by = PAGINATED_BY
 
-    def get_queryset(self):
-        return (super().get_queryset().filter(
-            is_published=True,
-            pub_date__lte=timezone.now(),
-            category__is_published=True
-        ).annotate(
-            comment_count=Count('comments')).order_by('-pub_date')
-        )
 
-
-class BlogCategoryListView(PostsQuerySetMixin, ListView):
+class BlogCategoryListView(ListView):
     """Страница категории блога"""
 
-    model = Post
     template_name = 'blog/category.html'
     context_object_name = 'post_list'
     paginate_by = PAGINATED_BY
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['category'] = get_object_or_404(
-            Category, slug=self.kwargs['category_slug'], is_published=True
+    def get_category(self):
+        """Возвращает категорию или 404"""
+        return get_object_or_404(
+            Category,
+            slug=self.kwargs['category_slug'],
+            is_published=True
         )
-        return context
 
     def get_queryset(self):
+        category = self.get_category()
         return (
-            super()
-            .get_queryset()
-            .filter(
-                category__slug=self.kwargs['category_slug'],
-                is_published=True,
-                pub_date__lte=timezone.now(),
-                category__is_published=True
-            )
-            .annotate(comment_count=Count('comments'))
-            .order_by('-pub_date')
+            get_post_queryset(apply_filters=True, apply_annotation=True)
+            .filter(category=category)
         )
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['category'] = self.get_category()
+        return context
 
-class PostDetailView(PostsQuerySetMixin, DetailView):
+
+class PostDetailView(DetailView):
     """Детальная страница поста"""
 
     model = Post
     template_name = 'blog/detail.html'
+    pk_url_kwarg = 'post_pk'
 
-    def get_queryset(self):
-        queryset = super().get_queryset().prefetch_related('comments')
-        if self.request.user.is_authenticated:
-            return queryset.filter(author=self.request.user) | queryset.filter(
-                is_published=True,
-                pub_date__lte=timezone.now()
-            )
-        return queryset.filter(
-            is_published=True,
-            pub_date__lte=timezone.now()
+    def get_object(self, queryset=None):
+        post = get_object_or_404(
+            Post.objects.select_related('author', 'location', 'category'),
+            pk=self.kwargs['post_pk']
         )
+
+        # Проверяем доступность поста
+        if (
+            post.author != self.request.user and (
+                not post.is_published
+                or not post.category.is_published
+                or post.pub_date > timezone.now()
+            )
+        ):
+            raise Http404("Пост недоступен")
+
+        return post
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form'] = CreateCommentForm()
-        context['comments'] = (
-            self.get_object().comments.select_related('author').all()
-        )
+        context['comments'] = self.object.comments.select_related('author').all()
         return context
+
 
 
 class RegistrationView(FormView):

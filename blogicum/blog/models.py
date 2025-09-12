@@ -5,6 +5,8 @@ from django.utils import timezone
 
 User = get_user_model()
 
+MAX_TITLE_LENGTH = 256
+
 
 class PostManager(models.Manager):
     def get_queryset(self):
@@ -45,7 +47,10 @@ class BaseModel(models.Model):
 
 
 class Category(BaseModel):
-    title = models.CharField(max_length=256, verbose_name='Заголовок')
+    title = models.CharField(
+        max_length=MAX_TITLE_LENGTH,
+        verbose_name='Заголовок'
+    )
     description = models.TextField(verbose_name='Описание')
 
     slug = models.SlugField(
@@ -71,7 +76,10 @@ class Category(BaseModel):
 
 
 class Location(BaseModel):
-    name = models.CharField(max_length=256, verbose_name='Название места')
+    name = models.CharField(
+        max_length=MAX_TITLE_LENGTH,
+        verbose_name='Название места'
+    )
 
     class Meta:
         verbose_name = 'местоположение'
@@ -82,12 +90,10 @@ class Location(BaseModel):
 
 
 class Post(BaseModel):
-    title = models.CharField(max_length=256, verbose_name='Заголовок')
+    title = models.CharField(max_length=MAX_TITLE_LENGTH, verbose_name='Заголовок')
     text = models.TextField(verbose_name='Текст')
     pub_date = models.DateTimeField(
         default=timezone.now,
-        auto_now=False,
-        auto_now_add=False,
         verbose_name='Дата и время публикации',
         help_text=(
             'Если установить дату и время в будущем — можно делать '
@@ -112,7 +118,6 @@ class Post(BaseModel):
         null=True,
     )
     image = models.ImageField('Изображение', blank=True, upload_to='img/')
-    objects = models.Manager()
     post_list = PostManager()
 
     class Meta:
@@ -121,11 +126,6 @@ class Post(BaseModel):
         ordering = ('-pub_date',)
         default_related_name = 'posts'
 
-    def __str__(self) -> str:
-        return self.title
-
-    def get_absolute_url(self) -> str:
-        return reverse('blog:post_detail', kwargs={'pk': self.pk})
 
 
 class Comment(models.Model):

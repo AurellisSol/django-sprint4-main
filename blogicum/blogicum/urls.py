@@ -6,7 +6,6 @@ from django.conf.urls.static import static
 from blog import views
 
 
-handler403 = 'pages.views.csrf_failure'
 handler404 = 'pages.views.page_not_found'
 handler500 = 'pages.views.server_error'
 

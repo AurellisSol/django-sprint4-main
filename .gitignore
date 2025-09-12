@@ -151,3 +151,7 @@ media/
 
 sent_emails/
 
+users/__init__.py
+blog/__init__.py
+blogicum/__init__.py
+pages/__init__.py
