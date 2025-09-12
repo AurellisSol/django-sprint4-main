@@ -1,37 +1,50 @@
 from django.contrib import admin
 
-from .models import Category, Location, Post
+from .models import Category, Location, Post, Comment
 
 
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('title', 'is_published', 'created_at')
-    list_editable = ('is_published',)
-    list_filter = ('is_published', 'created_at')
-    search_fields = ('title', 'description')
-    prepopulated_fields = {'slug': ('title',)}
-
-
-@admin.register(Location)
 class LocationAdmin(admin.ModelAdmin):
-    list_display = ('name', 'is_published', 'created_at')
-    list_editable = ('is_published',)
-    list_filter = ('is_published', 'created_at')
-    search_fields = ('name',)
+    list_display = (
+        "name",
+        "is_published",
+        "created_at",
+    )
+    list_editable = ("is_published",)
 
 
-@admin.register(Post)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "description",
+        "slug",
+        "is_published",
+        "created_at",
+    )
+    list_editable = ("is_published",)
+
+
 class PostAdmin(admin.ModelAdmin):
     list_display = (
-        'title',
-        'is_published',
-        'pub_date',
-        'author',
-        'category',
-        'location'
+        "title",
+        "author",
+        "category",
+        "location",
+        "is_published",
+        "pub_date",
+        "comment_count",
     )
-    list_editable = ('is_published',)
-    list_filter = ('is_published', 'pub_date', 'category', 'location')
-    search_fields = ('title', 'text')
-    date_hierarchy = 'pub_date'
-    raw_id_fields = ('author',)
+    list_editable = ("is_published",)
+    list_filter = (
+        "category",
+        "location",
+    )
+
+    @admin.display(description="Комментариев")
+    def comment_count(self, post):
+        return post.comments.count()
+
+
+admin.site.register(Post, PostAdmin)
+admin.site.register(Location, LocationAdmin)
+admin.site.register(Category, CategoryAdmin)
+admin.site.register(Comment)
