@@ -1,26 +1,22 @@
 from django.views.generic import TemplateView
-from django.contrib.auth import logout as django_logout
-from django.conf import settings
-from django.shortcuts import render, redirect
-from django.template import TemplateDoesNotExist
+from django.shortcuts import render
 
 
-class AboutPageView(TemplateView):
+class AboutPage(TemplateView):
     template_name = 'pages/about.html'
 
 
-class RulesPageView(TemplateView):
+class RulesPage(TemplateView):
     template_name = 'pages/rules.html'
-
-
-def csrf_failure(request, reason=""):
-    return render(request, 'pages/403csrf.html', status=403)
 
 
 def page_not_found(request, exception):
     return render(request, 'pages/404.html', status=404)
 
 
+def permission_denied(request, expection):
+    return render(request, 'pages/403csrf.html', status=403)
+
+
 def server_error(request):
     return render(request, 'pages/500.html', status=500)
-
