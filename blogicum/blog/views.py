@@ -22,7 +22,6 @@ from .models import Post, Category, Comment
 User = get_user_model()
 
 
-# Create your views here.
 def profile(request, username):
     user = get_object_or_404(User, username=username)
     if request.user == user:
@@ -54,7 +53,6 @@ class ProfileUpdateView(LoginRequiredMixin, UpdateView):
         return self.request.user
 
     def get_success_url(self):
-        # Динамически перенаправляет на профиль текущего пользователя
         return reverse_lazy(
             'blog:profile',
             kwargs={
@@ -212,10 +210,9 @@ class CommentUpdateView(UpdateView, LoginRequiredMixin):
         )
 
 
-class CommentDeleteView(DeleteView, LoginRequiredMixin):
+class CommentDeleteView(LoginRequiredMixin, DeleteView):
     model = Comment
     template_name = 'blog/comment.html'
-    form_class = CommentForm
     pk_url_kwarg = 'comment_id'
     target_post = None
 
@@ -236,6 +233,11 @@ class CommentDeleteView(DeleteView, LoginRequiredMixin):
                 'post_id': self.target_post.pk
             }
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.pop("form", None)
+        return context
 
 
 class CategoryListView(ListView):
